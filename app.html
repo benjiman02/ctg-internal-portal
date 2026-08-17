@@ -349,7 +349,8 @@
     if (!ME) return showSignIn("Your session has expired. Sign in again.");
     PERMS = await AUTH.permissions();
     $("signin").classList.add("hide"); $("app").classList.remove("hide");
-    $("who").textContent = ME.name + " · " + (PERMS ? PERMS.label : ME.role);
+    $("who").textContent = ME.name + " · " + (PERMS ? PERMS.label : ME.role) +
+      (PERMS && PERMS.read_only ? " · view only" : "");
 
     const res = await API.call("companies_list");
     COMPANIES = (res && res.ok) ? res.companies : [];
@@ -367,9 +368,14 @@
     renderTabs(); render();
   }
 
+  // Permission helpers. Every one asks what the server said this person may do, never what
+  // their role is called — renaming the top role once left it seeing nothing at all.
+  function feat(name){ return !!(PERMS && PERMS.features && PERMS.features.indexOf(name)>=0); }
+  function canWrite(){ return !!(PERMS && !PERMS.read_only); }
+  function canManageUsers(){ return !!(PERMS && PERMS.manage_users); }
+
   function visibleTabs(){
-    const features = (PERMS && PERMS.features) || [];
-    return TABS.filter((t)=> !t.feature || features.indexOf(t.feature)>=0 || ME.role==="admin");
+    return TABS.filter(function(t){ return !t.feature || feat(t.feature); });
   }
 
   function renderTabs(){
@@ -745,7 +751,7 @@
       (finalised
         ? '<span class="pill good"><span class="dot"></span>Finalised</span><span class="sub" style="margin:0">'+
           MONTHS[PR_MONTH-1]+" "+PR_YEAR+" is locked. Payslip figures below are the stored record.</span>"+
-          '<span class="grow"></span>'+(ME.role==="admin"?'<button class="btn btn-sm btn-ghost" id="reopenBtn">Reopen</button>':"")
+          '<span class="grow"></span>'+(canManageUsers()?'<button class="btn btn-sm btn-ghost" id="reopenBtn">Reopen</button>':"")
         : '<span class="pill warn"><span class="dot"></span>Draft</span><span class="sub" style="margin:0">'+
           "Edit any row, then finalise to lock the month and issue payslips.</span>"+
           '<span class="grow"></span><button class="btn btn-sm" id="finaliseBtn">Finalise '+MONTHS[PR_MONTH-1]+"</button>")+
@@ -1610,7 +1616,7 @@
   async function renderSettings(v){
     v.innerHTML='<h2>Settings</h2><p class="sub">Companies and the Xero connection.</p>'+
       '<div id="setCompanies"></div>'+
-      (ME.role==="admin"?'<h2 style="margin-top:28px">Xero connection</h2>'+
+      (canManageUsers()?'<h2 style="margin-top:28px">Xero connection</h2>'+
         '<p class="sub">One Xero grant covers every company. Each organisation is linked by hand — a wrong link posts invoices into the wrong entity\'s books.</p>'+
         '<div class="panel" id="xeroPanel"><p class="empty">Loading…</p></div>':"");
 
@@ -1622,7 +1628,7 @@
                        :'<span class="pill warn"><span class="dot"></span>Not connected</span>')+
       "</div>").join("");
 
-    if (ME.role==="admin") renderXero();
+    if (canManageUsers()) renderXero();
   }
 
   async function renderXero(){
