@@ -64,7 +64,6 @@
                radial-gradient(1000px 520px at 100% 0%, #16191C 0%, transparent 55%), #131416;
       --ink-navy:#0A1219;
       --brandwash:linear-gradient(135deg, #0E2739 0%, #17456A 45%, #2E7CB8 100%);
-    --band:rgba(74,156,214,.13);
       --band:rgba(74,156,214,.13);
     }
   }
@@ -471,7 +470,10 @@
     { key:"pnl",      label:"Profit & Loss", feature:"pnl" },
     { key:"brands",   label:"Brands", feature:"brands" },
     { key:"payroll",  label:"Payroll",   feature:"payroll" },
-    { key:"people",   label:"Employees", feature:"payroll" },
+    { key:"projects", label:"Project cost", feature:"payroll" },
+    // The directory carries no pay, so it is not gated on a money feature. Gating it on
+    // "payroll" locked the accounts team out of an employee list they are entitled to see.
+    { key:"people",   label:"People", feature:"hr_directory" },
     { key:"o2o",      label:"O2O Invoicing", feature:"o2o" },
     { key:"gateway",  label:"Gateway Fees", feature:"gateway_fees" },
     { key:"ap",       label:"Supplier Invoices", feature:"ap" },
@@ -528,6 +530,7 @@
     if (TAB==="brands")   return renderBrands(v);
     if (TAB==="payroll")  return renderPayroll(v);
     if (TAB==="people")   return renderPeople(v);
+    if (TAB==="projects") return renderProjects(v);
     if (TAB==="o2o")      return renderO2O(v);
     if (TAB==="gateway")  return renderGateway(v);
     if (TAB==="ap")       return renderAP(v);
@@ -718,35 +721,93 @@
 
   // ═══════════ employees ═══════════
   async function renderPeople(v){
-    if (!ACTIVE) { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
+    // Built on hr_directory: names, employers and project split, and not one pay figure. That
+    // is what lets the whole company use this page while salary stays with one role.
+    var period = PR_YEAR+"-"+String(PR_MONTH).padStart(2,"0");
     v.innerHTML = '<div class="row" style="margin-bottom:14px"><div class="grow">'+
-      '<h2>Employees</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+'</p></div>'+
-      '<button class="btn btn-sm" id="addEmp">Add employee</button></div>'+
-      '<div id="empList"><p class="empty">Loading…</p></div>';
-    $("addEmp").onclick = ()=>employeeModal(null);
+      '<h2>People</h2><p class="sub" style="margin:0">Who works here, and which projects carry their cost</p></div>'+
+      '<select id="pplMonth" style="width:auto">'+MONTHS.map(function(m,i){
+        return '<option value="'+(i+1)+'"'+(i+1===PR_MONTH?" selected":"")+">"+m+"</option>"; }).join("")+"</select>"+
+      '<select id="pplYear" style="width:auto">'+[PR_YEAR+1,PR_YEAR,PR_YEAR-1,PR_YEAR-2].map(function(y){
+        return '<option'+(y===PR_YEAR?" selected":"")+">"+y+"</option>"; }).join("")+"</select>"+
+      (canWrite()?'<button class="btn btn-sm btn-ghost" id="impInt">Import intake listing</button>':"")+
+      (canWrite()&&feat("payroll")?'<button class="btn btn-sm" id="addEmp">Add employee</button>':"")+
+      "</div><div id=\"empList\"><p class=\"empty\">Loading…</p></div>";
+    $("pplMonth").onchange=function(e){ PR_MONTH=parseInt(e.target.value,10); render(); };
+    $("pplYear").onchange=function(e){ PR_YEAR=parseInt(e.target.value,10); render(); };
+    var ai=$("impInt"); if(ai) ai.onclick=intakeImportModal;
+    var ae=$("addEmp"); if(ae) ae.onclick=function(){ employeeModal(null); };
 
-    const res = await API.call("hr_employees_list", { company_id: ACTIVE.id, include_resigned: true });
-    const box=$("empList");
-    if (!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
-    if (!res.employees.length){
-      box.innerHTML='<div class="panel"><p class="empty">No employees yet. Add the first one to start running payroll.</p></div>'; return;
+    var res = await API.call("hr_directory", { period: period });
+    var box=$("empList");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if(!res.employees.length){
+      box.innerHTML='<div class="panel"><p class="empty">Nobody on record yet. Import the intake '+
+        'listing to load the month\u2019s roster and its project split.</p></div>'; return;
     }
-    box.innerHTML='<div class="tbl-wrap"><table><thead><tr>'+
-      "<th>No.</th><th>Name</th><th>Position</th><th class='num'>Basic</th><th class='num'>Allowance</th>"+
-      "<th>Status</th><th></th></tr></thead><tbody>"+
-      res.employees.map((e)=>
-        "<tr><td class='mono'>"+esc(e.emp_no)+"</td>"+
-        "<td class='name'>"+esc(e.name)+"</td>"+
-        "<td>"+esc(e.position||"—")+"</td>"+
-        "<td class='num'>"+rm(e.basic_salary_sen)+"</td>"+
-        "<td class='num'>"+rm(e.fixed_allowance_sen)+"</td>"+
-        "<td>"+(e.status==="active"?'<span class="pill good">active</span>':'<span class="pill mute">resigned</span>')+"</td>"+
-        "<td><button class='link' data-id='"+esc(e.id)+"'>Edit</button></td></tr>").join("")+
-      "</tbody></table></div>";
-    box.querySelectorAll("button.link").forEach((b)=>{
-      b.onclick = ()=>employeeModal(res.employees.find((e)=>e.id===b.dataset.id));
+
+    var byCo={}, unalloc=0;
+    res.employees.forEach(function(e){
+      byCo[e.employer||"—"]=(byCo[e.employer||"—"]||0)+1;
+      if(!e.projects.length) unalloc++;
+    });
+    var html='<div class="tiles">'+
+      tile("People", String(res.employees.length), "on record")+
+      Object.keys(byCo).sort().map(function(c){
+        return tile(c, String(byCo[c]), "employed by"); }).join("")+
+      "</div>";
+
+    if(!res.salary_visible){
+      html+='<div class="msg"><strong>Pay is not shown on this page.</strong> Salary is restricted '+
+        'to the Head of Finance, and this page does not request it \u2014 the figures are not '+
+        'withheld in your browser, they are never sent.</div>';
+    }
+    if(unalloc){
+      html+='<div class="msg warn">'+unalloc+' '+(unalloc===1?"person has":"people have")+
+        ' no project against their name for '+MONTHS[PR_MONTH-1]+' '+PR_YEAR+
+        ', so their cost lands nowhere. Import that month\u2019s intake listing.</div>';
+    }
+
+    html+='<div class="tbl-wrap"><table><thead><tr><th>No.</th><th>Name</th><th>Employer</th>'+
+      '<th>Projects carrying the cost</th><th>Joined</th><th>Status</th>'+
+      (feat("payroll_individual")?"<th></th>":"")+'</tr></thead><tbody>'+
+      res.employees.map(function(e){
+        return "<tr>"+
+          "<td class='mono'>"+esc(e.emp_no||"—")+"</td>"+
+          "<td class='name'>"+esc(e.name)+
+            (nickWorthShowing(e.name,e.nickname)?' <span class="sub">'+esc(e.nickname)+"</span>":"")+
+            (e.note?'<div class="fld-note">'+esc(e.note)+"</div>":"")+"</td>"+
+          "<td>"+esc(e.employer||"—")+"</td>"+
+          "<td style='white-space:normal'>"+(e.projects.length
+            ? e.projects.map(function(p){
+                // The owning company is shown beside each project, because it is routinely NOT
+                // the employer -- the Account department is employed by CTG JV Malaysia while
+                // its project sits with CTG4U Wellness.
+                var cross = p.owner && p.owner!==e.employer;
+                return '<span class="pill '+(cross?"warn":"mute")+'" style="margin:1px 3px 1px 0" title="'+
+                  esc(p.project+" — owned by "+(p.owner||"?"))+'">'+esc(p.project)+" "+
+                  (p.pct===100?"":p.pct.toFixed(0)+"% ")+
+                  (cross?"\u2192 "+esc(p.owner):"")+"</span>";
+              }).join("")
+            : '<span style="color:var(--bad)">none</span>')+"</td>"+
+          "<td>"+esc(e.join_date||"—")+"</td>"+
+          "<td>"+(e.status==="active"?'<span class="pill good"><span class="dot"></span>active</span>'
+                 :'<span class="pill mute">'+esc(e.status)+"</span>")+"</td>"+
+          (feat("payroll_individual")
+            ? "<td><button class='link empPay' data-id='"+esc(e.id)+"' data-n='"+esc(e.name)+"'>Pay history</button></td>"
+            : "")+
+          "</tr>";
+      }).join("")+"</tbody></table></div>"+
+      '<p class="fld-note" style="margin-top:8px">An amber project tag means the project is owned '+
+      'by a different company from the employer. That is normal here, and it is why employer and '+
+      'project owner are tracked separately.</p>';
+
+    box.innerHTML=html;
+    box.querySelectorAll("button.empPay").forEach(function(b){
+      b.onclick=function(){ employeePayModal(b.dataset.id, b.dataset.n); };
     });
   }
+
 
   function employeeModal(emp){
     const e = emp || {};
@@ -854,13 +915,16 @@
   var PR_VIEW = "actual";   // "actual" = the month as paid; "computed" = a fresh calculation
 
   async function renderPayroll(v){
-    if (!ACTIVE) { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
+    // The group view spans every company, so it must not be gated on one being selected.
+    if (!ACTIVE && PR_VIEW!=="group") { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
     const years=[]; for(let y=today.getFullYear()+1;y>=today.getFullYear()-2;y--) years.push(y);
     v.innerHTML =
       '<div class="row" style="margin-bottom:16px"><div class="grow">'+
-      '<h2>Payroll</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+'</p></div>'+
+      '<h2>Payroll</h2><p class="sub" style="margin:0">'+
+      esc(PR_VIEW==="group" ? "All companies" : (ACTIVE?ACTIVE.short_name:""))+'</p></div>'+
       '<select id="prView" style="width:auto">'+
         '<option value="actual"'+(PR_VIEW==="actual"?" selected":"")+'>As paid (imported)</option>'+
+        '<option value="group"'+(PR_VIEW==="group"?" selected":"")+'>All companies</option>'+
         '<option value="computed"'+(PR_VIEW==="computed"?" selected":"")+'>Calculated by the system</option>'+
       '</select>'+
       '<select id="prMonth" style="width:auto">'+MONTHS.map((m,i)=>'<option value="'+(i+1)+'"'+(i+1===PR_MONTH?" selected":"")+">"+m+"</option>").join("")+"</select>"+
@@ -873,7 +937,76 @@
   }
 
   async function loadPayroll(){
-    return PR_VIEW==="actual" ? loadPayrollActual() : loadPayrollComputed();
+    if(PR_VIEW==="group")    return loadPayrollGroup();
+    if(PR_VIEW==="computed") return loadPayrollComputed();
+    return loadPayrollActual();
+  }
+
+  /** Every company's payroll for the month, side by side, ending in the figure that left the
+   *  bank. This is the page to put in front of a board: it is the whole group in one screen and
+   *  it reconciles against the source workbook, which is stated rather than assumed. */
+  async function loadPayrollGroup(){
+    var box=$("prBody"); if(!box) return;
+    box.innerHTML='<p class="empty">Loading…</p>';
+    var res=await API.call("hr_payroll_summary",{ year:PR_YEAR, month:PR_MONTH });
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if(!res.companies.length){
+      box.innerHTML='<div class="panel"><p class="empty">No payroll recorded for '+MONTHS[PR_MONTH-1]+" "+PR_YEAR+
+        '.</p><div class="row" style="margin-top:12px"><button class="btn btn-sm" id="gImp">Import salary workbook</button></div></div>';
+      var gi=$("gImp"); if(gi) gi.onclick=salaryImportModal; return;
+    }
+    var t=res.totals;
+    var html='<div class="tiles">'+
+      // The company count is the row count of the table below; the tile row balances at five.
+      tile("Headcount", String(t.headcount), "paid")+
+      tile("Gross pay", rm0(t.gross_sen), "basic + components")+
+      tile("Net pay", rm0(t.net_sen), "to bank accounts")+
+      tile("Statutory", rm0(t.epf_sen+t.socso_sen+t.eis_sen+t.pcb_sen+t.hrdf_sen), "EPF, PERKESO, LHDN, HRD Corp")+
+      tile("Out of bank", rm0(t.bank_total_sen), "the group total", true)+
+      "</div>";
+
+    // A company whose stored figures no longer match the workbook it came from is the one thing
+    // that must never be quiet.
+    if(res.disagreements && res.disagreements.length){
+      html+='<div class="msg err"><strong>'+res.disagreements.length+' compan'+
+        (res.disagreements.length===1?"y does":"ies do")+' not match the workbook they were imported from.</strong><ul style="margin:8px 0 0 18px">'+
+        res.disagreements.map(function(d){
+          return "<li>"+esc(d.company)+": workbook says "+rm(d.workbook)+", we hold "+rm(d.ours)+"</li>";
+        }).join("")+"</ul></div>";
+    } else {
+      html+='<div class="msg good"><strong>Every company ties to the workbook it came from.</strong> '+
+        'Each figure below was recomputed from the employee rows, not read off a summary line.</div>';
+    }
+
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Company</th><th class="num">Head</th>'+
+      '<th class="num">Basic</th><th class="num">Gross</th><th class="num">EPF</th>'+
+      '<th class="num">SOCSO</th><th class="num">EIS</th><th class="num">PCB</th>'+
+      '<th class="num">HRD Corp</th><th class="num">Net pay</th><th class="num">Out of bank</th>'+
+      '</tr></thead><tbody>'+
+      res.companies.map(function(c){
+        return "<tr><td class='name'>"+esc(c.company)+
+          (c.source==="imported"?' <span class="pill mute">imported</span>':"")+"</td>"+
+          "<td class='num'>"+c.headcount+"</td><td class='num'>"+rm(c.basic_sen)+"</td>"+
+          "<td class='num'>"+rm(c.gross_sen)+"</td><td class='num'>"+rm(c.epf_sen)+"</td>"+
+          "<td class='num'>"+rm(c.socso_sen)+"</td><td class='num'>"+rm(c.eis_sen)+"</td>"+
+          "<td class='num'>"+rm(c.pcb_sen)+"</td><td class='num'>"+rm(c.hrdf_sen)+"</td>"+
+          "<td class='num'>"+rm(c.net_sen)+"</td>"+
+          "<td class='num'><strong>"+rm(c.bank_total_sen)+"</strong></td></tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td>Group</td><td class='num'>"+t.headcount+"</td>"+
+      "<td class='num'>"+rm(t.basic_sen)+"</td><td class='num'>"+rm(t.gross_sen)+"</td>"+
+      "<td class='num'>"+rm(t.epf_sen)+"</td><td class='num'>"+rm(t.socso_sen)+"</td>"+
+      "<td class='num'>"+rm(t.eis_sen)+"</td><td class='num'>"+rm(t.pcb_sen)+"</td>"+
+      "<td class='num'>"+rm(t.hrdf_sen)+"</td><td class='num'>"+rm(t.net_sen)+"</td>"+
+      "<td class='num'>"+rm(t.bank_total_sen)+"</td></tr></tfoot></table></div>"+
+      '<p class="fld-note" style="margin-top:8px">SOCSO includes the SKBBK / LINDUNG 24 Jam '+
+      'premium. HRD Corp is 1% of basic pay. Out of bank is net pay plus everything remitted, '+
+      'including the employee\u2019s own share \u2014 it comes off the payslip and is then paid out '+
+      'by the company, so it leaves the account either way.</p>'+
+      '<div class="row" style="margin-top:14px"><span class="grow"></span>'+
+      '<button class="btn btn-sm btn-ghost" id="gImp2">Import salary workbook</button></div>';
+    box.innerHTML=html;
+    var g2=$("gImp2"); if(g2) g2.onclick=salaryImportModal;
   }
 
   /** The month as it was actually paid, with every pay component shown by its own name.
@@ -897,7 +1030,8 @@
 
     var html='<div class="tiles">'+
       tile("Headcount", String(t.headcount), "paid this month")+
-      tile("Basic pay", rm0(t.basic_sen), "before any component")+
+      // Basic pay is the first row of the breakdown table immediately below, so it does not
+      // need a tile of its own -- six tiles wrap and leave the last one stranded.
       tile("Components", rm0(t.components_total_sen), L.length+" kind"+(L.length===1?"":"s"))+
       tile("Gross pay", rm0(t.gross_sen), "basic + components")+
       tile("Net pay", rm0(t.net_sen), "to bank accounts")+
@@ -1328,6 +1462,213 @@
         m.textContent="Could not read that file."; m.classList.remove("hide"); };
       reader.readAsText(f);
     };
+  }
+
+
+  // ── project cost ────────────────────────────────────────────────────────────────────────
+
+  /** Employment cost by project: the number the intake listing exists to produce. */
+  async function renderProjects(v){
+    v.innerHTML='<div class="row" style="margin-bottom:14px"><div class="grow">'+
+      '<h2>Project cost</h2><p class="sub" style="margin:0">Where this month\u2019s employment cost lands</p></div>'+
+      '<select id="pjMonth" style="width:auto">'+MONTHS.map(function(m,i){
+        return '<option value="'+(i+1)+'"'+(i+1===PR_MONTH?" selected":"")+">"+m+"</option>"; }).join("")+"</select>"+
+      '<select id="pjYear" style="width:auto">'+[PR_YEAR+1,PR_YEAR,PR_YEAR-1,PR_YEAR-2].map(function(y){
+        return '<option'+(y===PR_YEAR?" selected":"")+">"+y+"</option>"; }).join("")+"</select>"+
+      "</div><div id=\"pjBody\"><p class=\"empty\">Loading…</p></div>";
+    $("pjMonth").onchange=function(e){ PR_MONTH=parseInt(e.target.value,10); render(); };
+    $("pjYear").onchange=function(e){ PR_YEAR=parseInt(e.target.value,10); render(); };
+
+    var res=await API.call("hr_project_cost",{ year:PR_YEAR, month:PR_MONTH });
+    var box=$("pjBody");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if(!res.projects.length){
+      box.innerHTML='<div class="panel"><p class="empty">Nothing to allocate for '+MONTHS[PR_MONTH-1]+" "+PR_YEAR+
+        '. Import that month\u2019s salary workbook and intake listing first.</p></div>'; return;
+    }
+
+    var rc=res.reconciliation;
+    var total=res.projects.reduce(function(a,p){return a+p.loaded_sen;},0);
+    var heads=res.projects.reduce(function(a,p){return a+p.headcount;},0);
+    var html='<div class="tiles">'+
+      tile("Projects", String(res.projects.length), "carrying cost")+
+      tile("Headcount", heads.toFixed(1), "shares add up")+
+      tile("Employment cost", rm0(total), "gross + employer statutory", true)+
+      tile("Unallocated", String(res.unallocated.length), res.unallocated.length?"cost landing nowhere":"everyone accounted for")+
+      "</div>";
+
+    if(res.unallocated.length){
+      html+='<div class="msg warn"><strong>'+res.unallocated.length+' paid '+
+        (res.unallocated.length===1?"person has":"people have")+' no project.</strong> Their cost is '+
+        'real and is currently landing nowhere: '+
+        res.unallocated.map(function(u){ return esc(u.name)+" ("+rm(u.loaded_sen)+")"; }).join(", ")+".</div>";
+    }
+
+    // Redirects: what operations keyed, versus where the cost was recorded, and why.
+    if(res.redirects && res.redirects.length){
+      html+='<div class="msg"><strong>'+res.redirects.length+' cost '+
+        (res.redirects.length===1?"centre is":"centres are")+' recorded somewhere other than keyed.</strong>'+
+        '<div class="tbl-wrap" style="margin-top:10px;box-shadow:none"><table><thead><tr>'+
+        '<th>Keyed to</th><th>Recorded as</th><th class="num">Head</th><th class="num">Moved</th><th>Why</th>'+
+        '</tr></thead><tbody>'+res.redirects.map(function(r){
+          return "<tr><td class='name'>"+esc(r.keyed_to)+'<div class="fld-note">'+esc(r.keyed_owner||"—")+"</div></td>"+
+            "<td class='name'>"+esc(r.recorded_as)+'<div class="fld-note">'+esc(r.recorded_owner||"—")+"</div></td>"+
+            "<td class='num'>"+r.headcount.toFixed(1)+"</td><td class='num'>"+rm(r.moved_sen)+"</td>"+
+            "<td style='white-space:normal;font-size:12px'>"+esc(r.reason||"")+"</td></tr>";
+        }).join("")+"</tbody></table></div></div>";
+    }
+
+    // Cost per project, with a bar so the shape reads before the numbers do.
+    var max=Math.max.apply(null,res.projects.map(function(p){return p.loaded_sen;}));
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Project</th><th>Owning company</th>'+
+      '<th class="num">Head</th><th class="num">Basic</th><th class="num">Gross</th>'+
+      '<th class="num">Employment cost</th><th style="width:170px"></th></tr></thead><tbody>'+
+      res.projects.map(function(p){
+        var pct=max?Math.round(p.loaded_sen/max*100):0;
+        return "<tr><td class='name'>"+esc(p.project)+"</td><td>"+esc(p.owner||"—")+"</td>"+
+          "<td class='num'>"+p.headcount.toFixed(1)+"</td>"+
+          "<td class='num'>"+rm(p.basic_sen)+"</td><td class='num'>"+rm(p.gross_sen)+"</td>"+
+          "<td class='num'><strong>"+rm(p.loaded_sen)+"</strong></td>"+
+          "<td><span style='display:block;height:7px;border-radius:4px;background:var(--brandwash);"+
+          "width:"+pct+"%;min-width:2px'></span></td></tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td colspan='2'>"+res.projects.length+" projects</td>"+
+      "<td class='num'>"+heads.toFixed(1)+"</td>"+
+      "<td class='num'>"+rm(res.projects.reduce(function(a,p){return a+p.basic_sen;},0))+"</td>"+
+      "<td class='num'>"+rm(res.projects.reduce(function(a,p){return a+p.gross_sen;},0))+"</td>"+
+      "<td class='num'>"+rm(total)+"</td><td></td></tr></tfoot></table></div>";
+
+    // The rounding note. Stated rather than absorbed, so nobody hunts a discrepancy the
+    // arithmetic guarantees.
+    if(rc){
+      html+='<p class="fld-note" style="margin-top:10px">Employment cost is gross pay plus the '+
+        'employer\u2019s own EPF, SOCSO and EIS. It excludes the HRD Corp levy, which is charged on '+
+        'the company\u2019s total basic pay rather than on any one person. Spreading cost across '+
+        'people rounds each share to the sen, so the parts differ from the whole by '+
+        '<strong>'+rm(Math.abs(rc.rounding_sen))+'</strong> \u2014 exact cost '+rm(rc.exact_loaded_sen)+
+        ', spread '+rm(rc.allocated_sen)+".</p>";
+    }
+    box.innerHTML=html;
+  }
+
+  // ── intake listing import ───────────────────────────────────────────────────────────────
+
+  /** Imports one month of the intake listing: the roster, and which projects carry each person.
+   *  Carries no pay, so it sits behind the directory rather than behind payroll. */
+  function intakeImportModal(){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:620px"><h3>Import the intake listing</h3>'+
+      '<div id="itMsg" class="msg err hide"></div>'+
+      '<p class="sub">The monthly sheet your operations team keys \u2014 one tab per month, a column '+
+      'per project. It sets who was working and which projects carry their cost. No pay figures '+
+      'are in this file.</p>'+
+      '<div class="fields">'+
+        '<div class="full"><label>Which tab</label><select id="i_tab"><option>Choose a file first</option></select>'+
+        '<div class="fld-note">The month and year are read from the tab name.</div></div>'+
+        '<div class="full"><label>Workbook (.xlsx)</label><input type="file" id="i_file" accept=".xlsx"></div>'+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="itCancel">Cancel</button>'+
+      '<button class="btn btn-sm btn-ghost" id="itDry">Check only</button>'+
+      '<button class="btn btn-sm" id="itGo">Import</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#itCancel").onclick=function(){ bg.remove(); };
+
+    var GRIDS=null;
+    bg.querySelector("#i_file").onchange=async function(ev){
+      var f=ev.target.files[0]; if(!f) return;
+      var sel=bg.querySelector("#i_tab");
+      sel.innerHTML="<option>Reading\u2026</option>";
+      try{
+        var X=await loadXlsx();
+        var wb=X.read(new Uint8Array(await f.arrayBuffer()),{type:"array",cellDates:false});
+        GRIDS={};
+        wb.SheetNames.forEach(function(n){
+          GRIDS[n]=X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true});
+        });
+        // Only tabs whose name reads as a month are offered, so "Leave Table" and "Sheet2"
+        // cannot be imported as a period by mistake.
+        var months=wb.SheetNames.filter(function(n){
+          return /(20\d{2})/.test(n) && /jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec/i.test(n);
+        });
+        sel.innerHTML=months.length
+          ? months.map(function(n){ return '<option>'+esc(n)+"</option>"; }).join("")
+          : "<option>No month tabs found</option>";
+      }catch(err){
+        sel.innerHTML="<option>Could not read that file</option>";
+        var m=bg.querySelector("#itMsg"); m.textContent=String(err&&err.message||err); m.classList.remove("hide");
+      }
+    };
+
+    async function run(dry){
+      var m=bg.querySelector("#itMsg"); m.classList.add("hide"); m.className="msg err hide";
+      var tab=bg.querySelector("#i_tab").value;
+      if(!GRIDS || !GRIDS[tab]){ m.textContent="Choose a file and a month tab first.";
+        m.className="msg err"; m.classList.remove("hide"); return; }
+      var btn=bg.querySelector(dry?"#itDry":"#itGo"); var label=btn.textContent; btn.disabled=true;
+      btn.textContent="Working\u2026";
+      var res=await API.call("hr_import_intake",{ sheet_name:tab, grid:GRIDS[tab], dry_run:!!dry });
+      btn.disabled=false; btn.textContent=label;
+      if(!res.ok){ m.innerHTML=esc(AUTH.friendlyError(res.error)); m.className="msg err";
+        m.classList.remove("hide"); return; }
+      if(dry){
+        m.className="msg";
+        m.innerHTML="<strong>Checked "+esc(res.period)+", nothing written.</strong> "+
+          res.employees_in_scope+" people in scope, "+res.projects+" projects."+
+          (res.employees_dropped_as_out_of_scope
+            ? " "+res.employees_dropped_as_out_of_scope+" left out as out of scope ("+
+              esc((res.ignored_employers||[]).join(", "))+")." : "")+
+          (res.unmatched_employers && res.unmatched_employers.length
+            ? '<div style="margin-top:6px;color:var(--bad)"><strong>Unrecognised employers: '+
+              esc(res.unmatched_employers.join(", "))+"</strong> \u2014 these would stop the import.</div>":"")+
+          (res.mismatched_rows && res.mismatched_rows.length
+            ? '<ul style="margin:8px 0 0 18px">'+res.mismatched_rows.map(function(r){
+                return "<li>"+esc(r.name)+" (row "+r.row+"): "+esc(r.problem)+"</li>"; }).join("")+"</ul>":"");
+        m.classList.remove("hide"); return;
+      }
+      bg.remove();
+      toast(res.employees_seen+" people \u00b7 "+res.allocations+" project allocations \u00b7 "+esc(res.period));
+      render();
+    }
+    bg.querySelector("#itDry").onclick=function(){ run(true); };
+    bg.querySelector("#itGo").onclick=function(){ run(false); };
+  }
+
+  /** One person's pay history. The most sensitive view in the system. */
+  async function employeePayModal(id, name){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:760px"><h3>'+esc(name)+'</h3>'+
+      '<div id="epBody"><p class="empty">Loading\u2026</p></div>'+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="epClose">Close</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#epClose").onclick=function(){ bg.remove(); };
+
+    var res=await API.call("hr_employee_pay",{ employee_id:id });
+    var box=bg.querySelector("#epBody");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if(!res.months.length){ box.innerHTML='<p class="empty">No payroll recorded for this person yet.</p>'; return; }
+    // Every component under its own name, per month, because that is the whole point.
+    var labels=[]; res.months.forEach(function(mo){
+      Object.keys(mo.components||{}).forEach(function(k){ if(labels.indexOf(k)<0) labels.push(k); });
+    });
+    box.innerHTML='<p class="sub">'+esc(res.employee.emp_no||"")+
+      (res.employee.position?" \u00b7 "+esc(res.employee.position):"")+"</p>"+
+      '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Month</th>'+
+      '<th class="num">Basic</th>'+labels.map(function(l){
+        return '<th class="num" title="'+esc(l)+'">'+esc(l.split("(")[0].replace(/[.,;:\s]+$/,"").trim().slice(0,16))+"</th>";
+      }).join("")+
+      '<th class="num">Gross</th><th class="num">EPF</th><th class="num">PCB</th><th class="num">Net</th>'+
+      '</tr></thead><tbody>'+
+      res.months.map(function(mo){
+        return "<tr><td class='name'>"+esc(mo.period)+"</td><td class='num'>"+rm(mo.basic_sen)+"</td>"+
+          labels.map(function(l){
+            var vv=(mo.components||{})[l];
+            return "<td class='num'>"+(vv?rm(vv):'<span style="color:var(--ink-faint)">—</span>')+"</td>";
+          }).join("")+
+          "<td class='num'>"+rm(mo.gross_sen)+"</td><td class='num'>"+rm(mo.epf_ee_sen)+"</td>"+
+          "<td class='num'>"+rm(mo.pcb_sen)+"</td><td class='num'><strong>"+rm(mo.net_sen)+"</strong></td></tr>";
+      }).join("")+"</tbody></table></div>";
   }
 
   // ── billing workbook import ──────────────────────────────────────────────────────────
