@@ -1745,17 +1745,24 @@
     var g=res.grand, months=res.months;
     var html="";
 
+    if(res.quality && res.quality.length){
+      html+='<div class="msg warn"><strong>Figures below need a caveat:</strong>'+
+        '<ul style="margin:8px 0 0;padding-left:20px">'+
+        res.quality.map(function(q){ return "<li><strong>"+esc(q.company)+"</strong> — "+esc(q.issue)+"</li>"; }).join("")+
+        "</ul></div>";
+    }
     if(res.companies_missing && res.companies_missing.length){
       html+='<div class="msg warn">No profit &amp; loss loaded for: '+res.companies_missing.map(esc).join(", ")+
         ". Those companies contribute nothing to the figures below.</div>";
     }
 
     html+='<div class="tiles">'+
-      tile("Revenue", rm0(g.revenue_sen), months.length+" months", true)+
+      tile("Trading revenue", rm0(g.revenue_sen), months.length+" months", true)+
+      (g.other_income_sen? tile("Other income", rm0(g.other_income_sen), "not trading revenue"):"")+
       (g.other_income_sen?tile("Other income", rm0(g.other_income_sen), "outside trading revenue"):"")+
       tile("Gross profit", rm0(g.gross_profit_sen), (g.gp_margin_pct!=null?g.gp_margin_pct+"% margin":""))+
       tile("Operating expenses", rm0(g.expenses_sen), (g.expense_ratio_pct!=null?g.expense_ratio_pct+"% of revenue":""))+
-      tile("Net profit", rm0(g.net_profit_sen), (g.net_margin_pct!=null?g.net_margin_pct+"% net margin":""), true)+
+      tile("Net profit", rm0(g.net_profit_sen), (g.net_margin_pct!=null?g.net_margin_pct+"% of total income":""), true)+
       "</div>";
 
     // Revenue vs expenses by month
@@ -1796,7 +1803,8 @@
     var streamKeys=Object.keys(res.streams||{});
     if(streamKeys.length){
       html+='<div class="panel" style="margin-top:18px"><h2 style="font-size:16px">Revenue by stream</h2>'+
-        '<p class="sub">Which channel the revenue came through, taken from the account it was booked to.</p>'+
+        '<p class="sub">Which channel the income came through, taken from the account it was booked to. '+
+        'Covers '+(res.coverage?esc(res.coverage.streams_label):"all income")+'.</p>'+
         svgStack(months,res.streams,BLOCK_COLOURS)+"</div>";
     }
 
@@ -1804,7 +1812,8 @@
     var blockKeys=Object.keys(res.blocks||{});
     if(blockKeys.length){
       html+='<div class="panel"><h2 style="font-size:16px">Operating expenses by cost block</h2>'+
-        '<p class="sub">Staff, fulfilment, marketing, general, finance — so a rise in cost can be attributed.</p>'+
+        '<p class="sub">Staff, fulfilment, marketing, general, finance — so a rise in cost can be attributed. '+
+        'Covers '+(res.coverage?esc(res.coverage.blocks_label):"operating expenses")+'.</p>'+
         svgStack(months,res.blocks,BLOCK_COLOURS)+"</div>";
     }
 
