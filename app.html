@@ -6,57 +6,83 @@
 <title>CTG Internal Finance Portal</title>
 <meta name="robots" content="noindex">
 <style>
+  /* ── CTG brand ──────────────────────────────────────────────────────────────
+     Three circles, three colours: sky blue, amber, vermilion — on warm off-white.
+     Blue carries the interface (it is the calm one, and the mark's apex). Vermilion
+     is reserved for action and for what is overdue, so a CTA and a problem never
+     compete for the same attention. Amber warns. Green stays green because in
+     finance a positive number must never be a brand decision. */
   :root{
-    --paper:#F3F5F6; --raised:#FFFFFF; --sunken:#EDF1F2;
-    --ink:#14202B; --ink-soft:#4B5C68; --ink-faint:#7C8A93;
-    --rule:#D6DEE1; --rule-soft:#E6ECEE;
-    --accent:#1B6B63; --accent-strong:#134F49; --accent-soft:#E4F0EE;
-    --good:#2E7D4F; --good-soft:#E4F3EA;
-    --warn:#B8860F; --warn-soft:#FAF1DC;
-    --bad:#B3261E;  --bad-soft:#FBE9E7;
-    --mute:#7C8A93; --mute-soft:#E9ECEE;
-    --shadow:0 1px 2px rgba(20,32,43,.06),0 6px 20px rgba(20,32,43,.05);
+    --ctg-blue:#2E7CB8;   --ctg-blue-lt:#4A9CD6;  --ctg-blue-soft:#E4F0F8;
+    --ctg-amber:#D99400;  --ctg-amber-lt:#F2A900; --ctg-amber-soft:#FDF2DC;
+    --ctg-verm:#E1451C;   --ctg-verm-lt:#F04E23;  --ctg-verm-soft:#FDEAE4;
+
+    --paper:#F2F1EE; --raised:#FFFFFF; --sunken:#EAE8E4;
+    --ink:#111214; --ink-soft:#4E5257; --ink-faint:#85898F;
+    --rule:#DCD9D4; --rule-soft:#E9E6E1;
+    --accent:var(--ctg-blue); --accent-strong:#1F5D8C; --accent-soft:var(--ctg-blue-soft);
+    --cta:var(--ctg-verm); --cta-soft:var(--ctg-verm-soft);
+    --good:#1F7A4C; --good-soft:#E2F2E9;
+    --warn:var(--ctg-amber); --warn-soft:var(--ctg-amber-soft);
+    --bad:var(--ctg-verm);   --bad-soft:var(--ctg-verm-soft);
+    --mute:#85898F; --mute-soft:#E9E6E1;
+    --shadow:0 1px 2px rgba(17,18,20,.05),0 6px 20px rgba(17,18,20,.05);
   }
   @media (prefers-color-scheme:dark){
     :root:not([data-theme="light"]){
-      --paper:#12181E; --raised:#182028; --sunken:#0E141A;
-      --ink:#EDF1F2; --ink-soft:#A7B7C0; --ink-faint:#7E8E97;
-      --rule:#2B3742; --rule-soft:#212B33;
-      --accent:#59BBAC; --accent-strong:#7FD2C4; --accent-soft:#173B37;
-      --good:#5CBE85; --good-soft:#173325;
-      --warn:#E3B84C; --warn-soft:#332A11;
-      --bad:#E9897F;  --bad-soft:#3A1E1B;
-      --mute:#93A2AA; --mute-soft:#212B33;
-      --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+      --paper:#131416; --raised:#1B1D20; --sunken:#0E0F11;
+      --ink:#F2F1EE; --ink-soft:#AFB3B8; --ink-faint:#83878D;
+      --rule:#2C2F33; --rule-soft:#232629;
+      --accent:var(--ctg-blue-lt); --accent-strong:#7FBEE6; --accent-soft:#16303F;
+      --cta:var(--ctg-verm-lt); --cta-soft:#3A1A11;
+      --good:#4FBF85; --good-soft:#12301F;
+      --warn:var(--ctg-amber-lt); --warn-soft:#33280C;
+      --bad:#FF7551;  --bad-soft:#3A1A11;
+      --mute:#8E9298; --mute-soft:#232629;
+      --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.4);
     }
   }
   :root[data-theme="dark"]{
-    --paper:#12181E; --raised:#182028; --sunken:#0E141A;
-    --ink:#EDF1F2; --ink-soft:#A7B7C0; --ink-faint:#7E8E97;
-    --rule:#2B3742; --rule-soft:#212B33;
-    --accent:#59BBAC; --accent-strong:#7FD2C4; --accent-soft:#173B37;
-    --good:#5CBE85; --good-soft:#173325;
-    --warn:#E3B84C; --warn-soft:#332A11;
-    --bad:#E9897F;  --bad-soft:#3A1E1B;
-    --mute:#93A2AA; --mute-soft:#212B33;
-    --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px rgba(0,0,0,.35);
+    --paper:#131416; --raised:#1B1D20; --sunken:#0E0F11;
+    --ink:#F2F1EE; --ink-soft:#AFB3B8; --ink-faint:#83878D;
+    --rule:#2C2F33; --rule-soft:#232629;
+    --accent:var(--ctg-blue-lt); --accent-strong:#7FBEE6; --accent-soft:#16303F;
+    --cta:var(--ctg-verm-lt); --cta-soft:#3A1A11;
+    --good:#4FBF85; --good-soft:#12301F;
+    --warn:var(--ctg-amber-lt); --warn-soft:#33280C;
+    --bad:#FF7551;  --bad-soft:#3A1A11;
+    --mute:#8E9298; --mute-soft:#232629;
+    --shadow:0 1px 2px rgba(0,0,0,.35),0 10px 30px rgba(0,0,0,.4);
   }
 
   *{box-sizing:border-box}
   body{margin:0;background:var(--paper);color:var(--ink);
-       font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+       font:15px/1.55 "Helvetica Neue",Helvetica,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+       -webkit-font-smoothing:antialiased}
+  /* The brand sets everything in a bold geometric sans. Headings take the weight and
+     tighten, which is what makes type read as CTG rather than as a default admin panel. */
+  h1,h2,h3{font-weight:700;letter-spacing:-.02em}
   .mono,.num{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
   .hide{display:none !important}
+
+  /* The three-circle monogram, drawn rather than loaded so it is crisp at any size and
+     costs no request. Blue apex, amber and vermilion below — the arrangement is the brand. */
+  .mark{display:block}
+  .mark circle,.mark line{fill:none;stroke-linecap:butt}
+
+  /* Primary actions stay brand blue: calm, and the mark's apex colour. Vermilion is held
+     back for what is overdue or destructive, so the boldest colour in the palette always
+     means "look at this", never merely "continue". */
   button{font:inherit;cursor:pointer}
   button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  h2{font-size:20px;margin:0 0 4px}
+  h2{font-size:21px;margin:0 0 4px}
   .sub{color:var(--ink-soft);font-size:14px;margin:0 0 18px}
 
   /* ── sign in ── */
   #signin{min-height:100vh;display:grid;place-items:center;padding:24px}
   .card{background:var(--raised);border:1px solid var(--rule);border-radius:14px;padding:32px;
         width:100%;max-width:400px;box-shadow:var(--shadow)}
-  .brand{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:8px}
+  .brand{font-size:13.5px;letter-spacing:.02em;color:var(--ink);font-weight:700;margin-bottom:8px}
   .card h1{font-size:21px;margin:0 0 22px;line-height:1.25}
   label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:0 0 6px}
   input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--rule);border-radius:8px;
@@ -86,7 +112,7 @@
   nav.tabs button{background:none;border:none;padding:10px 14px;font-size:14px;color:var(--ink-faint);
                   border-bottom:2px solid transparent;white-space:nowrap}
   nav.tabs button:hover{color:var(--ink)}
-  nav.tabs button.on{color:var(--accent-strong);border-bottom-color:var(--accent);font-weight:600}
+  nav.tabs button.on{color:var(--ink);border-bottom-color:var(--ctg-verm-lt);font-weight:700}
   main{max-width:1240px;margin:0 auto;padding:26px 20px 90px}
 
   /* ── generic surfaces ── */
@@ -102,6 +128,11 @@
   .tile .v{font-size:22px;font-weight:700;letter-spacing:-.01em}
   .tile .m{font-size:12px;color:var(--ink-faint);margin-top:3px}
   .tile.accent .v{color:var(--accent-strong)}
+  /* A hairline of brand colour along the top of each tile, cycling the three hues so a
+     row of figures carries the mark's palette without shouting. */
+  .tiles .tile:nth-child(3n+1){border-top:3px solid var(--ctg-blue-lt)}
+  .tiles .tile:nth-child(3n+2){border-top:3px solid var(--ctg-amber-lt)}
+  .tiles .tile:nth-child(3n+3){border-top:3px solid var(--ctg-verm-lt)}
 
   /* ── tables ── */
   .tbl-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:12px;background:var(--raised);box-shadow:var(--shadow)}
@@ -160,7 +191,19 @@
 <!-- ═══════════ sign in ═══════════ -->
 <div id="signin">
   <div class="card">
-    <div class="brand">CTG Internal</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px">
+      <svg class="mark" width="48" height="48" viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="24" r="16" stroke="var(--ctg-blue-lt)" stroke-width="7"/>
+        <circle cx="26" cy="68" r="16" stroke="var(--ctg-amber-lt)" stroke-width="7"/>
+        <line x1="26" y1="49" x2="26" y2="87" stroke="var(--ctg-amber-lt)" stroke-width="7"/>
+        <circle cx="74" cy="68" r="16" stroke="var(--ctg-verm-lt)" stroke-width="7"/>
+        <line x1="74" y1="68" x2="94" y2="68" stroke="var(--ctg-verm-lt)" stroke-width="7"/>
+      </svg>
+      <div>
+        <div class="brand" style="margin:0">CTG Internal</div>
+        <div style="font-size:11.5px;color:var(--ink-faint);letter-spacing:.04em">CARE THROUGH GOODS</div>
+      </div>
+    </div>
     <h1 id="signinTitle">Sign in to the finance portal</h1>
     <div id="signinMsg" class="msg err hide"></div>
 
@@ -198,6 +241,13 @@
 <div id="app" class="hide">
   <header>
     <div class="bar">
+      <svg class="mark" width="28" height="28" viewBox="0 0 100 100" aria-hidden="true" style="flex-shrink:0">
+        <circle cx="50" cy="24" r="16" stroke="var(--ctg-blue-lt)" stroke-width="8"/>
+        <circle cx="26" cy="68" r="16" stroke="var(--ctg-amber-lt)" stroke-width="8"/>
+        <line x1="26" y1="49" x2="26" y2="87" stroke="var(--ctg-amber-lt)" stroke-width="8"/>
+        <circle cx="74" cy="68" r="16" stroke="var(--ctg-verm-lt)" stroke-width="8"/>
+        <line x1="74" y1="68" x2="94" y2="68" stroke="var(--ctg-verm-lt)" stroke-width="8"/>
+      </svg>
       <span class="name">CTG Internal Finance</span>
       <select id="companySel" title="Active company"></select>
       <span class="spacer"></span>
