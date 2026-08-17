@@ -288,6 +288,7 @@
     { key:"overview", label:"Overview" },
     { key:"payroll",  label:"Payroll",   feature:"payroll" },
     { key:"people",   label:"Employees", feature:"payroll" },
+    { key:"o2o",      label:"O2O Invoicing", feature:"o2o" },
     { key:"settings", label:"Settings" },
   ];
 
@@ -333,6 +334,7 @@
     if (TAB==="overview") return renderOverview(v);
     if (TAB==="payroll")  return renderPayroll(v);
     if (TAB==="people")   return renderPeople(v);
+    if (TAB==="o2o")      return renderO2O(v);
     if (TAB==="settings") return renderSettings(v);
   }
 
@@ -819,6 +821,273 @@
       btn.disabled=false; btn.textContent="Reopen";
       if(!res.ok){ const m=bg.querySelector("#roMsg"); m.textContent=res.error; m.classList.remove("hide"); return; }
       bg.remove(); toast("Reopened"); loadPayroll();
+    };
+  }
+
+
+  // ═══════════ O2O pharmacy invoicing ═══════════
+  let O2O_BATCH = null;
+
+  async function renderO2O(v){
+    if (!ACTIVE) { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
+    if (O2O_BATCH) return renderO2OBatch(v, O2O_BATCH);
+
+    v.innerHTML =
+      '<div class="row" style="margin-bottom:16px"><div class="grow">'+
+      '<h2>O2O invoicing</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+
+      ' — import a month of pharmacy sales, then raise one invoice per pharmacy.</p></div>'+
+      '<button class="btn btn-sm" id="newBatch">Import sales file</button></div>'+
+      '<div id="batchList"><p class="empty">Loading…</p></div>';
+    $("newBatch").onclick = importModal;
+
+    const res = await API.call("o2o_batches_list", { company_id: ACTIVE.id });
+    const box=$("batchList");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+'</p>'; return; }
+    if(!res.batches.length){
+      box.innerHTML='<div class="panel"><p class="empty">No sales files imported yet. '+
+        'Export your pharmacy sales as CSV and import it to get started.</p></div>'; return;
+    }
+    box.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Period</th><th>File</th>'+
+      '<th>Status</th><th>Imported</th><th></th></tr></thead><tbody>'+
+      res.batches.map(function(b){
+        var pill = b.status==="issued" ? '<span class="pill good">issued</span>'
+                 : b.status==="cancelled" ? '<span class="pill mute">cancelled</span>'
+                 : '<span class="pill warn">draft</span>';
+        return "<tr><td class='name'>"+esc(MONTHS[b.period_month-1])+" "+esc(b.period_year)+"</td>"+
+          "<td>"+esc(b.source_name||"—")+"</td><td>"+pill+"</td>"+
+          "<td>"+esc(fmtDate(b.created_at))+"</td>"+
+          "<td><button class='link' data-b='"+esc(b.id)+"'>Open</button></td></tr>";
+      }).join("")+"</tbody></table></div>";
+    box.querySelectorAll("button.link").forEach(function(btn){
+      btn.onclick=function(){ O2O_BATCH=btn.dataset.b; render(); };
+    });
+  }
+
+  function importModal(){
+    var now=new Date();
+    var years=[]; for(var y=now.getFullYear()+1;y>=now.getFullYear()-2;y--) years.push(y);
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:540px"><h3>Import pharmacy sales</h3>'+
+      '<div id="impMsg" class="msg err hide"></div>'+
+      '<p class="sub">A CSV with one row per sale. It needs a pharmacy column and an amount column; '+
+      'date, item code, description and quantity are used when present. Column names are matched loosely.</p>'+
+      '<div class="fields">'+
+        '<div><label>Month</label><select id="i_month">'+MONTHS.map(function(m,i){
+          return '<option value="'+(i+1)+'"'+(i+1===now.getMonth()+1?" selected":"")+">"+m+"</option>"; }).join("")+"</select></div>"+
+        '<div><label>Year</label><select id="i_year">'+years.map(function(y){
+          return '<option'+(y===now.getFullYear()?" selected":"")+">"+y+"</option>"; }).join("")+"</select></div>"+
+        '<div class="full"><label>Revenue account code in Xero</label>'+
+          '<input id="i_acct" placeholder="e.g. 200"><div class="fld-note">Left blank, Xero uses the account on each contact or its default.</div></div>'+
+        '<div class="full"><label>CSV file</label><input type="file" id="i_file" accept=".csv,text/csv"></div>'+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="impCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="impGo">Import</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#impCancel").onclick=function(){ bg.remove(); };
+    bg.querySelector("#impGo").onclick=function(){
+      var f=bg.querySelector("#i_file").files[0];
+      var m=bg.querySelector("#impMsg");
+      if(!f){ m.textContent="Choose a CSV file first."; m.classList.remove("hide"); return; }
+      var btn=bg.querySelector("#impGo"); btn.disabled=true; btn.textContent="Reading…";
+      var reader=new FileReader();
+      reader.onload=async function(){
+        btn.textContent="Importing…";
+        var res=await API.call("o2o_import",{
+          company_id:ACTIVE.id,
+          year:parseInt(bg.querySelector("#i_year").value,10),
+          month:parseInt(bg.querySelector("#i_month").value,10),
+          csv:String(reader.result), source_name:f.name,
+        });
+        btn.disabled=false; btn.textContent="Import";
+        if(!res.ok){
+          m.innerHTML=esc(res.error)+(res.headers?'<br><span style="font-size:12px">Columns found: '+esc(res.headers.join(", "))+"</span>":"");
+          m.classList.remove("hide"); return;
+        }
+        bg.remove();
+        toast("Imported "+res.imported+" line"+(res.imported===1?"":"s")+
+              (res.rejected_count?" · "+res.rejected_count+" rejected":""));
+        O2O_BATCH=res.batch_id; render();
+      };
+      reader.onerror=function(){ btn.disabled=false; btn.textContent="Import";
+        m.textContent="Could not read that file."; m.classList.remove("hide"); };
+      reader.readAsText(f);
+    };
+  }
+
+  async function renderO2OBatch(v, batchId){
+    v.innerHTML='<button class="link" id="backBtn">← All imports</button>'+
+      '<div id="bBody" style="margin-top:12px"><p class="empty">Loading…</p></div>';
+    $("backBtn").onclick=function(){ O2O_BATCH=null; render(); };
+
+    var res=await API.call("o2o_batch_get",{ company_id:ACTIVE.id, batch_id:batchId });
+    var box=$("bBody");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+
+    var t=res.totals, b=res.batch;
+    var html='<div class="row" style="margin-bottom:14px"><div class="grow">'+
+      "<h2>"+esc(MONTHS[b.period_month-1])+" "+esc(b.period_year)+"</h2>"+
+      '<p class="sub" style="margin:0">'+esc(b.source_name||"imported file")+"</p></div>"+
+      (b.status==="issued"?'<span class="pill good">issued</span>':"")+"</div>";
+
+    html+='<div class="tiles">'+
+      tile("Pharmacies", String(t.pharmacies), "one invoice each")+
+      tile("Sales lines", String(t.lines), "")+
+      tile("Batch value", rm0(t.total_sen), "before tax", true)+
+      tile("Needs a contact", String(t.unlinked), t.unlinked? "cannot invoice until linked":"all linked")+
+      tile("Already issued", String(t.already_issued), "in Xero")+
+      "</div>";
+
+    if(t.unlinked){
+      html+='<div class="msg warn"><strong>'+t.unlinked+' pharmac'+(t.unlinked===1?"y":"ies")+
+        " not yet matched to a Xero contact.</strong> They are skipped when issuing — an invoice "+
+        "raised against the wrong customer is a real bill to a real company, so this step is manual."+
+        '<div style="margin-top:10px"><button class="btn btn-sm" id="resolveBtn">Match to Xero contacts</button></div></div>';
+    }
+
+    html+='<div class="row" style="margin:16px 0 10px">'+
+      (b.status!=="issued"
+        ? '<button class="btn btn-sm btn-ghost" id="dryBtn">Preview invoices</button>'+
+          '<button class="btn btn-sm" id="issueBtn">Issue '+(t.pharmacies-t.unlinked-t.already_issued)+' invoice(s) in Xero</button>'
+        : "")+
+      '<span class="grow"></span>'+
+      (b.status!=="issued"&&!t.already_issued?'<button class="btn btn-sm btn-ghost" id="delBtn">Delete import</button>':"")+
+      "</div>";
+
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Pharmacy</th><th>Xero contact</th>'+
+      '<th class="num">Lines</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>'+
+      res.groups.map(function(g){
+        var contact = g.xero_contact_name
+          ? esc(g.xero_contact_name)+(g.match_method==="fuzzy_auto"?' <span class="pill mute">auto '+(g.match_score||"")+"</span>":"")
+          : '<span style="color:var(--bad)">not matched</span>';
+        var st = g.issued && g.issued.status==="issued"
+          ? '<span class="pill good">'+esc(g.issued.xero_invoice_number||"issued")+"</span>"
+          : g.issued && g.issued.status==="failed"
+          ? '<span class="pill bad" title="'+esc(g.issued.error||"")+'">failed</span>'
+          : g.xero_contact_id ? '<span class="pill warn">ready</span>' : '<span class="pill mute">blocked</span>';
+        return "<tr><td class='name'>"+esc(g.pharmacy_name)+"</td><td>"+contact+"</td>"+
+          "<td class='num'>"+g.lines.length+"</td><td class='num'>"+rm(g.total_sen)+"</td>"+
+          "<td>"+st+"</td></tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td colspan='2'>Total</td><td class='num'>"+t.lines+"</td>"+
+      "<td class='num'>"+rm(t.total_sen)+"</td><td></td></tr></tfoot></table></div>";
+
+    box.innerHTML=html;
+
+    var rb=$("resolveBtn");
+    if(rb) rb.onclick=async function(){
+      rb.disabled=true; rb.textContent="Reading Xero contacts…";
+      var r=await API.call("o2o_resolve_contacts",{ company_id:ACTIVE.id, batch_id:batchId });
+      rb.disabled=false; rb.textContent="Match to Xero contacts";
+      if(!r.ok) return alert(r.error);
+      matchModal(r, batchId);
+    };
+    var db=$("dryBtn");
+    if(db) db.onclick=async function(){
+      db.disabled=true; db.textContent="Building preview…";
+      var r=await API.call("o2o_issue",{ company_id:ACTIVE.id, batch_id:batchId, dry_run:true });
+      db.disabled=false; db.textContent="Preview invoices";
+      if(!r.ok) return alert(r.error);
+      previewModal(r);
+    };
+    var ib=$("issueBtn");
+    if(ib) ib.onclick=function(){ confirmIssue(batchId, t); };
+    var xb=$("delBtn");
+    if(xb) xb.onclick=async function(){
+      if(!confirm("Delete this import? Nothing has been sent to Xero, so this only removes the imported rows.")) return;
+      var r=await API.call("o2o_batch_delete",{ company_id:ACTIVE.id, batch_id:batchId });
+      if(!r.ok) return alert(r.error);
+      toast("Import deleted"); O2O_BATCH=null; render();
+    };
+  }
+
+  function matchModal(r, batchId){
+    var needs=r.pharmacies.filter(function(p){ return p.state==="needs_review"; });
+    var options=r.contact_options.map(function(c){
+      return '<option value="'+esc(c.id)+'|'+esc(c.name)+'">'+esc(c.name)+"</option>"; }).join("");
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal"><h3>Match pharmacies to Xero contacts</h3>'+
+      '<p class="sub">'+r.contacts_scanned+" contacts read from Xero. "+
+      (r.pharmacies.length-needs.length)+" already matched. Confirm each remaining one — "+
+      "a suggestion is only a suggestion.</p>"+
+      (needs.length? needs.map(function(p){
+        return '<div style="padding:10px 0;border-bottom:1px solid var(--rule-soft)" data-p="'+esc(p.id)+'">'+
+          "<strong>"+esc(p.name)+"</strong>"+
+          (p.suggestion?'<div class="fld-note">closest: '+esc(p.suggestion.contact_name)+" ("+p.suggestion.score+")</div>":
+                        '<div class="fld-note">no close match found</div>')+
+          '<select class="pmatch" style="margin-top:6px"><option value="">Choose a Xero contact…</option>'+options+"</select></div>";
+      }).join("") : '<p class="empty">Everything is matched.</p>')+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="mCancel">Close</button>'+
+      (needs.length?'<button class="btn btn-sm" id="mSave">Save matches</button>':"")+"</div></div>";
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    // Pre-select each suggestion so a correct one is one click, but never pre-saved.
+    needs.forEach(function(p){
+      if(!p.suggestion) return;
+      var row=bg.querySelector('[data-p="'+p.id+'"] select');
+      if(row) row.value=p.suggestion.contact_id+"|"+p.suggestion.contact_name;
+    });
+    bg.querySelector("#mCancel").onclick=function(){ bg.remove(); renderO2OBatch($("view"),batchId); };
+    var ms=bg.querySelector("#mSave");
+    if(ms) ms.onclick=async function(){
+      ms.disabled=true; ms.textContent="Saving…";
+      var rows=[].slice.call(bg.querySelectorAll("[data-p]"));
+      for(var i=0;i<rows.length;i++){
+        var sel=rows[i].querySelector("select");
+        if(!sel.value) continue;
+        var parts=sel.value.split("|");
+        await API.call("o2o_link_pharmacy",{ company_id:ACTIVE.id, pharmacy_id:rows[i].dataset.p,
+                                             contact_id:parts[0], contact_name:parts[1] });
+      }
+      bg.remove(); toast("Matches saved"); renderO2OBatch($("view"),batchId);
+    };
+  }
+
+  function previewModal(r){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal"><h3>Invoice preview</h3>'+
+      '<p class="sub">'+r.would_issue+" invoice(s), RM"+(r.total_sen/100).toLocaleString("en-MY",{minimumFractionDigits:2})+
+      " total. Nothing has been sent to Xero.</p>"+
+      r.preview.map(function(p){
+        return '<div class="panel" style="margin-bottom:10px"><strong>'+esc(p.pharmacy)+"</strong>"+
+          '<div class="fld-note">to '+esc(p.contact)+" · due "+esc(p.payload.DueDate)+" · ref "+esc(p.payload.Reference)+"</div>"+
+          '<div class="tbl-wrap" style="box-shadow:none;margin-top:8px"><table><thead><tr>'+
+          '<th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Line</th></tr></thead><tbody>'+
+          p.payload.LineItems.map(function(li){
+            return "<tr><td>"+esc(li.Description)+"</td><td class='num'>"+li.Quantity+"</td>"+
+              "<td class='num'>"+li.UnitAmount.toFixed(2)+"</td>"+
+              "<td class='num'>"+(li.Quantity*li.UnitAmount).toFixed(2)+"</td></tr>";
+          }).join("")+"</tbody></table></div></div>";
+      }).join("")+
+      (r.would_issue>r.preview.length?'<p class="sub">…and '+(r.would_issue-r.preview.length)+" more.</p>":"")+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="pClose">Close</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#pClose").onclick=function(){ bg.remove(); };
+  }
+
+  function confirmIssue(batchId, t){
+    var count=t.pharmacies-t.unlinked-t.already_issued;
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:470px"><h3>Issue '+count+' invoice(s) in Xero?</h3>'+
+      '<p class="sub">These are created as <strong>authorised</strong> invoices in Xero — real bills to real '+
+      "customers, immediately part of your receivables. They are not drafts.</p>"+
+      (t.unlinked?'<div class="msg warn">'+t.unlinked+" unmatched pharmac"+(t.unlinked===1?"y":"ies")+
+        " will be skipped.</div>":"")+
+      '<div id="isMsg" class="msg err hide"></div>'+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="isCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="isGo">Issue in Xero</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#isCancel").onclick=function(){ bg.remove(); };
+    bg.querySelector("#isGo").onclick=async function(){
+      var btn=bg.querySelector("#isGo"); btn.disabled=true; btn.textContent="Issuing…";
+      var r=await API.call("o2o_issue",{ company_id:ACTIVE.id, batch_id:batchId });
+      btn.disabled=false; btn.textContent="Issue in Xero";
+      if(!r.ok){ var m=bg.querySelector("#isMsg"); m.textContent=r.error; m.classList.remove("hide"); return; }
+      bg.remove();
+      toast("Issued "+r.issued+(r.failed?" · "+r.failed+" failed":""));
+      renderO2OBatch($("view"),batchId);
     };
   }
 
