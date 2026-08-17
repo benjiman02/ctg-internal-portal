@@ -1752,6 +1752,7 @@
 
     html+='<div class="tiles">'+
       tile("Revenue", rm0(g.revenue_sen), months.length+" months", true)+
+      (g.other_income_sen?tile("Other income", rm0(g.other_income_sen), "outside trading revenue"):"")+
       tile("Gross profit", rm0(g.gross_profit_sen), (g.gp_margin_pct!=null?g.gp_margin_pct+"% margin":""))+
       tile("Operating expenses", rm0(g.expenses_sen), (g.expense_ratio_pct!=null?g.expense_ratio_pct+"% of revenue":""))+
       tile("Net profit", rm0(g.net_profit_sen), (g.net_margin_pct!=null?g.net_margin_pct+"% net margin":""), true)+
