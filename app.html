@@ -339,6 +339,7 @@
     { key:"payroll",  label:"Payroll",   feature:"payroll" },
     { key:"people",   label:"Employees", feature:"payroll" },
     { key:"o2o",      label:"O2O Invoicing", feature:"o2o" },
+    { key:"gateway",  label:"Gateway Fees", feature:"gateway_fees" },
     { key:"settings", label:"Settings" },
   ];
 
@@ -385,6 +386,7 @@
     if (TAB==="payroll")  return renderPayroll(v);
     if (TAB==="people")   return renderPeople(v);
     if (TAB==="o2o")      return renderO2O(v);
+    if (TAB==="gateway")  return renderGateway(v);
     if (TAB==="settings") return renderSettings(v);
   }
 
@@ -1139,6 +1141,187 @@
       toast("Issued "+r.issued+(r.failed?" · "+r.failed+" failed":""));
       renderO2OBatch($("view"),batchId);
     };
+  }
+
+
+  // ═══════════ gateway fees ═══════════
+  var GW_YEAR = new Date().getFullYear();
+  var GATEWAYS = ["Atome","PayEx","Curlec","iPay88","ShopeePay","GrabPay","Boost","Billplz","Stripe","Razer","Other"];
+
+  async function renderGateway(v){
+    if (!ACTIVE) { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
+    var years=[]; for(var y=new Date().getFullYear();y>=new Date().getFullYear()-3;y--) years.push(y);
+    v.innerHTML=
+      '<div class="row" style="margin-bottom:16px"><div class="grow">'+
+      '<h2>Payment gateway fees</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+
+      ' — what each gateway actually costs, broken down by fee type.</p></div>'+
+      '<select id="gwYear" style="width:auto">'+years.map(function(y){
+        return '<option'+(y===GW_YEAR?" selected":"")+">"+y+"</option>"; }).join("")+"</select>"+
+      '<button class="btn btn-sm" id="gwImport">Import settlement</button></div>'+
+      '<div id="gwBody"><p class="empty">Loading…</p></div>';
+    $("gwYear").onchange=function(e){ GW_YEAR=parseInt(e.target.value,10); loadGateway(); };
+    $("gwImport").onclick=gwImportModal;
+    loadGateway();
+  }
+
+  async function loadGateway(){
+    var box=$("gwBody"); if(!box) return;
+    box.innerHTML='<p class="empty">Loading…</p>';
+    var rep=await API.call("gateway_fee_report",{ company_id:ACTIVE.id, year:GW_YEAR });
+    var list=await API.call("gateway_settlements_list",{ company_id:ACTIVE.id, year:GW_YEAR });
+    if(!rep.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(rep.error))+"</p>"; return; }
+
+    if(!rep.gateways.length){
+      box.innerHTML='<div class="panel"><p class="empty">No settlements imported for '+GW_YEAR+' yet. '+
+        'Export a settlement report from any gateway and import it — the fee columns are matched automatically.</p></div>';
+      return;
+    }
+
+    var t=rep.totals;
+    var html='<div class="tiles">'+
+      tile("Processed", rm0(t.gross_sen), "gross through gateways")+
+      tile("Fees paid", rm0(t.fees_sen), "the real cost", true)+
+      tile("Received", rm0(t.net_sen), "banked after fees")+
+      tile("Blended rate", t.effective_rate_pct+"%", "across all gateways", true)+
+      "</div>";
+
+    // Fee cost by gateway, biggest first: the one to renegotiate is at the top.
+    html+='<div class="panel"><h2 style="font-size:16px">Cost by gateway</h2>'+
+      '<p class="sub">Effective rate includes flat fees and SST, not just the headline MDR — '+
+      'two gateways quoting the same rate can cost quite differently.</p>'+
+      '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Gateway</th>'+
+      '<th class="num">Processed</th><th class="num">Fees</th><th class="num">Effective rate</th>'+
+      '<th class="num">Txns</th><th class="num">Avg fee/txn</th></tr></thead><tbody>'+
+      rep.gateways.map(function(g){
+        var worst = g.effective_rate_pct === Math.max.apply(null, rep.gateways.map(function(x){return x.effective_rate_pct;}));
+        return "<tr><td class='name'>"+esc(g.gateway)+"</td>"+
+          "<td class='num'>"+rm(g.gross_sen)+"</td>"+
+          "<td class='num'>"+rm(g.fees_sen)+"</td>"+
+          "<td class='num'"+(worst?" style='color:var(--bad);font-weight:700'":"")+">"+g.effective_rate_pct+"%</td>"+
+          "<td class='num'>"+g.txns+"</td><td class='num'>"+rm(g.avg_fee_per_txn_sen)+"</td></tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td>All gateways</td><td class='num'>"+rm(t.gross_sen)+"</td>"+
+      "<td class='num'>"+rm(t.fees_sen)+"</td><td class='num'>"+t.effective_rate_pct+"%</td>"+
+      "<td class='num'>"+rep.gateways.reduce(function(s,g){return s+g.txns;},0)+"</td><td></td></tr></tfoot></table></div></div>";
+
+    // The component breakdown — the thing that did not exist anywhere before.
+    html+='<div class="panel"><h2 style="font-size:16px">What the fees are made of</h2>'+
+      '<p class="sub">Each component kept separate, so a gateway invoice can be checked line by line '+
+      'rather than accepted as one number.</p>'+
+      '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Gateway</th>'+
+      '<th class="num">MDR</th><th class="num">MDR SST</th><th class="num">Flat</th>'+
+      '<th class="num">Flat SST</th><th class="num">Refund</th><th class="num">Refund SST</th>'+
+      '<th class="num">Rebate</th><th class="num">Net fees</th></tr></thead><tbody>'+
+      rep.gateways.map(function(g){
+        var c=g.components||{};
+        var cell=function(x){ return "<td class='num'>"+(x?rm(x):"—")+"</td>"; };
+        return "<tr><td class='name'>"+esc(g.gateway)+"</td>"+
+          cell(c.mdr)+cell(c.mdr_sst)+cell(c.flat)+cell(c.flat_sst)+cell(c.refund)+cell(c.refund_sst)+
+          "<td class='num'"+(c.rebate?" style='color:var(--good)'":"")+">"+(c.rebate?"−"+rm(c.rebate):"—")+"</td>"+
+          "<td class='num'><strong>"+rm(g.fees_sen)+"</strong></td></tr>";
+      }).join("")+"</tbody></table></div></div>";
+
+    if(list.ok && list.settlements.length){
+      html+='<h2 style="font-size:16px;margin:24px 0 4px">Imported settlements</h2>'+
+        '<p class="sub">Every file imported for '+GW_YEAR+'.</p>'+
+        '<div class="tbl-wrap"><table><thead><tr><th>Period</th><th>Gateway</th><th>File</th>'+
+        '<th class="num">Gross</th><th class="num">Fees</th><th class="num">Net</th><th class="num">Rows</th><th></th></tr></thead><tbody>'+
+        list.settlements.map(function(s){
+          return "<tr><td>"+esc(MONTHS[s.period_month-1])+"</td><td class='name'>"+esc(s.gateway)+"</td>"+
+            "<td>"+esc(s.source_name||"—")+"</td><td class='num'>"+rm(s.gross_sen)+"</td>"+
+            "<td class='num'>"+rm(s.fees_total_sen)+"</td><td class='num'>"+rm(s.net_sen)+"</td>"+
+            "<td class='num'>"+s.line_count+"</td>"+
+            "<td><button class='link' data-s='"+esc(s.id)+"'>Delete</button></td></tr>";
+        }).join("")+"</tbody></table></div>";
+    }
+
+    box.innerHTML=html;
+    box.querySelectorAll("button.link[data-s]").forEach(function(btn){
+      btn.onclick=async function(){
+        if(!confirm("Delete this imported settlement? The gateway file itself is untouched.")) return;
+        var r=await API.call("gateway_settlement_delete",{ company_id:ACTIVE.id, settlement_id:btn.dataset.s });
+        if(!r.ok) return alert(r.error);
+        toast("Deleted"); loadGateway();
+      };
+    });
+  }
+
+  function gwImportModal(){
+    var now=new Date();
+    var years=[]; for(var y=now.getFullYear();y>=now.getFullYear()-3;y--) years.push(y);
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:540px"><h3>Import a gateway settlement</h3>'+
+      '<div id="gwMsg" class="msg err hide"></div>'+
+      '<p class="sub">The settlement or transaction report from the gateway, as CSV. Fee columns '+
+      '(MDR, SST, flat, refund, rebate) are matched by name — anything it cannot account for is reported.</p>'+
+      '<div class="fields">'+
+        '<div><label>Gateway</label><select id="g_gw">'+GATEWAYS.map(function(x){
+          return "<option>"+x+"</option>"; }).join("")+"</select></div>"+
+        '<div><label>Month</label><select id="g_month">'+MONTHS.map(function(m,i){
+          return '<option value="'+(i+1)+'"'+(i+1===now.getMonth()+1?" selected":"")+">"+m+"</option>"; }).join("")+"</select></div>"+
+        '<div><label>Year</label><select id="g_year">'+years.map(function(y){
+          return '<option'+(y===now.getFullYear()?" selected":"")+">"+y+"</option>"; }).join("")+"</select></div>"+
+        '<div class="full"><label>CSV file</label><input type="file" id="g_file" accept=".csv,text/csv"></div>'+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="gCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="gGo">Import</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#gCancel").onclick=function(){ bg.remove(); };
+    bg.querySelector("#gGo").onclick=function(){
+      var f=bg.querySelector("#g_file").files[0];
+      var m=bg.querySelector("#gwMsg");
+      if(!f){ m.textContent="Choose a CSV file first."; m.classList.remove("hide"); return; }
+      var btn=bg.querySelector("#gGo"); btn.disabled=true; btn.textContent="Reading…";
+      var reader=new FileReader();
+      reader.onload=async function(){
+        btn.textContent="Importing…";
+        var res=await API.call("gateway_import",{
+          company_id:ACTIVE.id, gateway:bg.querySelector("#g_gw").value,
+          year:parseInt(bg.querySelector("#g_year").value,10),
+          month:parseInt(bg.querySelector("#g_month").value,10),
+          csv:String(reader.result), source_name:f.name,
+        });
+        btn.disabled=false; btn.textContent="Import";
+        if(!res.ok){
+          m.innerHTML=esc(res.error)+(res.headers?'<br><span style="font-size:12px">Columns found: '+esc(res.headers.join(", "))+"</span>":"");
+          m.classList.remove("hide"); return;
+        }
+        bg.remove();
+        gwResultModal(res);
+        GW_YEAR=parseInt(bg.querySelector("#g_year")?bg.querySelector("#g_year").value:GW_YEAR,10)||GW_YEAR;
+        loadGateway();
+      };
+      reader.onerror=function(){ btn.disabled=false; btn.textContent="Import";
+        m.textContent="Could not read that file."; m.classList.remove("hide"); };
+      reader.readAsText(f);
+    };
+  }
+
+  // Always show what the import concluded. A fee figure accepted without seeing which columns
+  // produced it is a figure nobody can defend later.
+  function gwResultModal(res){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:520px"><h3>Imported '+res.imported+' transaction(s)</h3>'+
+      '<div class="tiles" style="margin-bottom:14px">'+
+        tile("Gross", rm0(res.gross_sen), "")+
+        tile("Fees", rm0(res.fees_total_sen), res.effective_rate_pct+"% effective", true)+
+        tile("Net", rm0(res.net_sen), "")+
+      "</div>"+
+      (res.warnings && res.warnings.length
+        ? '<div class="msg warn">'+res.warnings.map(esc).join("<br><br>")+"</div>" : "")+
+      '<p class="sub" style="margin-bottom:6px"><strong>Fee columns recognised</strong></p>'+
+      (res.fee_columns_found.length
+        ? '<div class="tbl-wrap" style="box-shadow:none"><table><tbody>'+
+          res.fee_columns_found.map(function(f){
+            return "<tr><td>"+esc(f.field.replace(/_sen$/,"").replace(/_/g," "))+"</td>"+
+                   "<td class='name'>"+esc(f.column)+"</td></tr>"; }).join("")+
+          "</tbody></table></div>"
+        : '<p class="empty">None — every fee will show as zero.</p>')+
+      '<div class="modal-actions"><button class="btn btn-sm" id="gwOk">Done</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#gwOk").onclick=function(){ bg.remove(); };
   }
 
   // ═══════════ settings ═══════════
