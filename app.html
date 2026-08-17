@@ -985,7 +985,7 @@
   // SheetJS is vendored rather than pulled from a CDN, and loaded only when someone actually
   // opens this modal: 273KB has no business slowing down the dashboard, and a month-end that
   // depends on a CDN being reachable is a month-end that eventually fails.
-  var XLSX_READY=null, WB_NO_SALES=null;
+  var XLSX_READY=null, WB_NO_SALES=null, WB_FREE_GOODS=null;
   function loadXlsx(){
     if(XLSX_READY) return XLSX_READY;
     XLSX_READY=new Promise(function(res,rej){
@@ -1071,6 +1071,7 @@
         if(res.pharmacies_with_no_sales && res.pharmacies_with_no_sales.length){
           WB_NO_SALES=res.pharmacies_with_no_sales;
         } else { WB_NO_SALES=null; }
+        WB_FREE_GOODS = res.free_goods && res.free_goods.length ? res.free_goods : null;
         O2O_BATCH=res.batch_id; render();
       }catch(err){ fail(String(err&&err.message||err)); }
     };
@@ -1129,9 +1130,27 @@
       }
       if(t.excluded_count){
         html+='<div class="msg warn"><strong>'+t.excluded_count+' row(s) worth '+rm(t.excluded_sen)+
-          ' left off the billing</strong> — samples, testers, FOC and replacements. They still left the '+
-          'warehouse, so they count for stock, but billing a pharmacy for a gift is a real bill for '+
-          'goods it was given.</div>';
+          ' held back from billing.</strong> On these the package itself looks like the giveaway, '+
+          'not an extra handed over with a sale — so they wait for you rather than being guessed at.</div>';
+      }
+      // Every free-goods note, with the evidence. A row that bills because of a rule is worth
+      // showing too: silent rules are the ones nobody notices going wrong.
+      if(WB_FREE_GOODS){
+        var billed=WB_FREE_GOODS.filter(function(x){return x.verdict==="bill";});
+        html+='<details class="msg"><summary style="cursor:pointer"><strong>'+WB_FREE_GOODS.length+
+          ' free-goods note'+(WB_FREE_GOODS.length===1?"":"s")+' in this file</strong> — '+
+          billed.length+' read as a freebie given <em>with</em> a paid sale, so the package is still billed. '+
+          'Click to check the reasoning.</summary>'+
+          '<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Pharmacy</th><th>Brand</th>'+
+          '<th>Note</th><th class="num">Package</th><th>Why</th><th></th></tr></thead><tbody>'+
+          WB_FREE_GOODS.map(function(x){
+            return "<tr><td class='name'>"+esc(x.pharmacy)+"</td><td>"+esc(x.brand||"—")+"</td>"+
+              "<td>"+esc(x.note)+"</td><td class='num'>"+rm(x.gross_sen)+"</td>"+
+              "<td style='font-size:12px'>"+esc(x.because)+"</td>"+
+              "<td>"+(x.verdict==="bill"
+                ? "<button class='link mkExcl' data-m='"+esc(x.note)+"'>Don't bill it</button>"
+                : "<button class='link mkBill' data-m='"+esc(x.note)+"'>Bill it</button>")+"</td></tr>";
+          }).join("")+"</tbody></table></div></details>";
       }
       if(res.needs_a_decision && res.needs_a_decision.length){
         html+='<div class="msg warn"><strong>'+res.needs_a_decision.length+
