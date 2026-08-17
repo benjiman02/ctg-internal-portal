@@ -314,7 +314,95 @@
          -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
          box-shadow:0 1px 0 rgba(255,255,255,.1) inset,0 12px 36px -8px rgba(0,0,0,.55);
          animation:rise .26s var(--ease)}
-  @media(max-width:600px){main{padding:20px 14px 70px}.bar{padding:10px 14px}nav.tabs{padding:0 14px}}
+  /* ── phone ───────────────────────────────────────────────────────────────────────────────
+     The people who most need this portal will read it on a phone, standing up, once a month.
+     So this is not a shrink-to-fit pass; three things actually change shape.
+
+     1. Wide tables stop being tables. A ten-column payroll grid on a 390px screen is a
+        horizontal-scroll puzzle, and a figure you have to hunt for is a figure you distrust.
+        Each row becomes a card with its own label per line, driven by data-label attributes
+        that the desktop layout ignores entirely.
+     2. Tiles go two-up rather than one-up. A single column of six tiles is six screens of
+        scrolling to read six numbers.
+     3. Type sizes go UP, not down. Small text on a small screen is the most common mobile
+        mistake; the constraint is width, not legibility. */
+  @media (max-width:720px){
+    main{padding:18px 12px 80px}
+    .masthead{margin:-18px -12px 18px;padding:22px 12px 16px}
+    h1{font-size:24px}
+    h2{font-size:19px}
+
+    /* Two-up tiles, and the figure is allowed to be big because it is the point of the tile. */
+    .tiles{grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:16px}
+    .tile{padding:13px 14px;border-radius:14px}
+    .tile .k{font-size:10px;letter-spacing:.07em;margin-bottom:6px}
+    .tile .v{font-size:clamp(17px,5.2vw,23px)}
+    .tile .m{font-size:11px}
+    /* A tile marked wide keeps the full width -- for the one figure that matters most. */
+    .tile.span2{grid-column:1/-1}
+
+    .panel{padding:16px 15px;border-radius:14px;margin-bottom:14px}
+    .grid{grid-template-columns:1fr}
+
+    /* Header: the company picker is the thing people reach for, so it gets the room. */
+    .bar{padding:10px 12px;gap:9px;flex-wrap:wrap}
+    .bar .who{display:none}
+    .bar select{flex:1;min-width:0}
+    nav.tabs{padding:0 12px;gap:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+    nav.tabs::-webkit-scrollbar{display:none}
+    nav.tabs button{padding:11px 12px;font-size:13.5px}
+
+    /* Tables become cards. Any table wrapped in .cards-on-phone opts in; the rest keep
+       scrolling horizontally, which is right for a genuinely numeric grid a person will
+       turn their phone sideways for. */
+    .cards-on-phone table,.cards-on-phone thead,.cards-on-phone tbody,
+    .cards-on-phone tr,.cards-on-phone td{display:block;width:auto}
+    .cards-on-phone thead{display:none}
+    .cards-on-phone{border:none;background:none;box-shadow:none;overflow:visible}
+    .cards-on-phone tbody tr{background:var(--raised);border:1px solid var(--rule);
+      border-radius:14px;padding:13px 15px;margin-bottom:10px;box-shadow:var(--lit),var(--e1)}
+    .cards-on-phone tbody tr:hover td{background:none}
+    .cards-on-phone td{border:none;padding:3px 0;white-space:normal;text-align:left;
+      display:flex;justify-content:space-between;gap:14px;align-items:baseline;font-size:13.5px}
+    /* The label comes from the cell itself, so one attribute in the markup serves both layouts. */
+    .cards-on-phone td::before{content:attr(data-label);color:var(--ink-faint);font-size:11px;
+      font-weight:700;letter-spacing:.06em;text-transform:uppercase;flex:0 0 auto}
+    .cards-on-phone td:empty{display:none}
+    /* The comparison bars earn their place on a wide table where the eye scans columns. In a
+       card every figure is already labelled and adjacent, so the bar is decoration that costs
+       a row. */
+    .cards-on-phone td[data-label="Shape"],
+    .cards-on-phone td[data-label="Share"]{display:none}
+    /* The name leads the card as a heading rather than as another labelled row. */
+    .cards-on-phone td.name{display:block;font-size:15.5px;font-weight:700;color:var(--ink);
+      margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--rule-soft)}
+    .cards-on-phone td.name::before{display:none}
+    .cards-on-phone td.num{font-variant-numeric:tabular-nums}
+    .cards-on-phone tfoot{display:block;margin-top:2px}
+    .cards-on-phone tfoot tr{display:block;background:var(--sunken);border:1px solid var(--rule);
+      border-radius:14px;padding:13px 15px}
+    .cards-on-phone tfoot td{border:none;font-weight:700}
+
+    /* A modal on a phone is a sheet: full width, off the bottom, thumb-reachable actions. */
+    .modal-bg{padding:0;align-items:flex-end}
+    .modal{max-width:none;border-radius:18px 18px 0 0;max-height:92vh;padding:20px 16px 22px}
+    .fields{grid-template-columns:1fr}
+    .modal-actions{position:sticky;bottom:0;background:var(--raised);padding-bottom:4px;
+      margin-bottom:-4px;flex-wrap:wrap}
+    .modal-actions .btn{flex:1;min-width:120px}
+
+    /* Touch targets. 44px is the floor below which people mis-tap. */
+    .btn{padding:12px 18px;font-size:14.5px}
+    .btn-sm{padding:10px 14px;font-size:13.5px}
+    input,select{padding:11px 12px;font-size:16px}   /* 16px stops iOS zooming on focus */
+    .row{gap:8px}
+  }
+  @media (max-width:359px){
+    /* Only on the genuinely tiny (iPhone SE 1st gen and similar) does one-up beat two-up.
+       At 375px two columns still hold a seven-figure ringgit total, and halving the scroll
+       is worth more than the extra few pixels of type. */
+    .tiles{grid-template-columns:1fr}
+  }
 </style>
 </head>
 <body>
@@ -344,6 +432,24 @@
       <label for="password">Password</label>
       <input id="password" type="password" autocomplete="current-password" required>
       <button class="btn btn-block" type="submit" id="pwBtn">Sign in</button>
+      <p style="text-align:center;margin:14px 0 0">
+        <button type="button" class="link" id="haveInvite">I have an invite code</button></p>
+    </form>
+
+    <!-- Claiming an invite: the code is the only credential, and the person chooses their own
+         password here. Nobody else ever sees it, including whoever invited them. -->
+    <form id="claimForm" class="hide">
+      <p class="hint">Enter the invite code you were given, then choose your own password. Nobody
+        else will ever see it — not even whoever invited you.</p>
+      <label for="cCode">Invite code</label>
+      <input id="cCode" class="mono" autocapitalize="characters" spellcheck="false"
+             placeholder="XXXXX-XXXXX-XXXXX-XXXXX" required>
+      <label for="cPw">Choose a password</label>
+      <input id="cPw" type="password" autocomplete="new-password" minlength="12" required>
+      <label for="cPw2">Repeat it</label>
+      <input id="cPw2" type="password" autocomplete="new-password" minlength="12" required>
+      <div class="fld-note" style="margin:6px 0 12px">At least 12 characters.</div>
+      <button class="btn btn-block" type="submit" id="claimBtn">Create my account</button>
     </form>
 
     <form id="twoFaForm" class="hide">
@@ -423,6 +529,36 @@
   }
   const clearMsg = () => $("signinMsg").classList.add("hide");
 
+  // Switch to claiming an invite. A separate form rather than a mode on the sign-in form,
+  // because "email + password" and "code + new password" are different acts and conflating
+  // them is how people end up typing a password into the wrong field.
+  $("haveInvite").addEventListener("click", ()=>{
+    $("pwForm").classList.add("hide");
+    $("claimForm").classList.remove("hide");
+    $("signinMsg").classList.add("hide");
+    $("signinTitle").textContent="Set up your account";
+    $("cCode").focus();
+  });
+
+  $("claimForm").addEventListener("submit", async (e)=>{
+    e.preventDefault();
+    const msg=$("signinMsg"); msg.classList.add("hide");
+    const pw=$("cPw").value, pw2=$("cPw2").value;
+    if(pw!==pw2){ msg.textContent="Those two passwords do not match."; msg.classList.remove("hide"); return; }
+    if(pw.length<12){ msg.textContent="Please choose at least 12 characters."; msg.classList.remove("hide"); return; }
+    const btn=$("claimBtn"); btn.disabled=true; btn.textContent="Creating…";
+    const res=await API.call("user_claim_invite",{ code:$("cCode").value.trim(), password:pw });
+    btn.disabled=false; btn.textContent="Create my account";
+    if(!res.ok){ msg.textContent=AUTH.friendlyError(res.error); msg.classList.remove("hide"); return; }
+    // Straight to signing in, with the email filled and the password they just chose cleared.
+    $("claimForm").classList.add("hide"); $("pwForm").classList.remove("hide");
+    $("signinTitle").textContent="Sign in to the finance portal";
+    $("email").value=res.email; $("cPw").value=""; $("cPw2").value=""; $("cCode").value="";
+    msg.className="msg ok"; msg.textContent="Your account is ready. Sign in with the password you just chose.";
+    msg.classList.remove("hide");
+    $("password").focus();
+  });
+
   $("pwForm").addEventListener("submit", async (e)=>{
     e.preventDefault(); clearMsg();
     const btn=$("pwBtn"); btn.disabled=true; btn.textContent="Signing in…";
@@ -477,6 +613,7 @@
     { key:"o2o",      label:"O2O Invoicing", feature:"o2o" },
     { key:"gateway",  label:"Gateway Fees", feature:"gateway_fees" },
     { key:"ap",       label:"Supplier Invoices", feature:"ap" },
+    { key:"users",    label:"People &amp; access", manage:true },
     { key:"settings", label:"Settings" },
   ];
 
@@ -511,7 +648,10 @@
   function canManageUsers(){ return !!(PERMS && PERMS.manage_users); }
 
   function visibleTabs(){
-    return TABS.filter(function(t){ return !t.feature || feat(t.feature); });
+    return TABS.filter(function(t){
+      if(t.manage) return canManageUsers();
+      return !t.feature || feat(t.feature);
+    });
   }
 
   function renderTabs(){
@@ -530,6 +670,7 @@
     if (TAB==="brands")   return renderBrands(v);
     if (TAB==="payroll")  return renderPayroll(v);
     if (TAB==="people")   return renderPeople(v);
+    if (TAB==="users")    return renderUsers(v);
     if (TAB==="projects") return renderProjects(v);
     if (TAB==="o2o")      return renderO2O(v);
     if (TAB==="gateway")  return renderGateway(v);
@@ -561,98 +702,225 @@
 
   async function loadDashboard(){
     const box=$("dashBody"); if(!box) return;
-    box.innerHTML='<p class="empty">Reading live figures from Xero…</p>';
-    const params = DASH_SCOPE==="group" ? {} : { company_id: DASH_SCOPE };
-    const res = await API.call("dashboard", params);
+    box.innerHTML='<p class="empty">Loading live figures from Xero…</p>';
+    const res = await API.call("dashboard", DASH_SCOPE==="group" ? {} : { company_id: DASH_SCOPE });
     if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
 
-    const asAtEl=$("dashAsAt");
-    if(asAtEl) asAtEl.textContent = "Live from Xero · as at "+fmtDateTime(res.as_at);
+    const g=res.group, asAt=new Date(res.as_at);
+    $("dashAsAt").textContent = (DASH_SCOPE==="group" ? "All companies" : (COMPANIES.find(function(c){return c.id===DASH_SCOPE;})||{}).short_name)+
+      " · live from Xero, as at "+asAt.toLocaleString("en-MY",{dateStyle:"medium",timeStyle:"short"});
 
-    if(!res.companies.length){ box.innerHTML='<p class="empty">No companies available to your account.</p>'; return; }
+    var html="";
 
-    const g=res.group;
-    let html="";
-
-    // Anything that failed is stated up front. A dashboard that silently drops a company
-    // reads as "we are owed less than we are", which is the worst possible way to be wrong.
-    if(g.errors && g.errors.length){
-      html+='<div class="msg warn" style="margin-bottom:16px"><strong>Some figures could not be read:</strong><ul style="margin:8px 0 0;padding-left:20px">'+
-        g.errors.map((e)=>"<li>"+esc(e.company)+" — "+esc(e.error)+"</li>").join("")+
-        "</ul>Totals below exclude these companies.</div>";
-    }
-    const noBank = res.companies.filter((c)=>c.connected && !c.bank_available);
-    if(noBank.length){
-      html+='<div class="msg warn" style="margin-bottom:16px"><strong>Bank balances not available for '+
-        noBank.map((c)=>esc(c.short_name)).join(", ")+".</strong> "+esc(noBank[0].bank_reason||"")+
-        ". Net position below therefore excludes cash for these companies — it is not zero, it is unknown.</div>";
-    }
-    const notConnected = res.companies.filter((c)=>!c.connected);
-    if(notConnected.length){
-      html+='<div class="msg warn" style="margin-bottom:16px">Not yet connected to Xero, so contributing nothing to these totals: '+
-        notConnected.map((c)=>esc(c.short_name)).join(", ")+"</div>";
-    }
-
+    // ── the six figures a board actually asks for ──────────────────────────────────────────
+    var pnl=res.pnl, pay=res.payroll, o2o=res.o2o;
+    var net=g.receivables_sen-g.payables_sen;
     html+='<div class="tiles">'+
-      tile("Owed to us", rm0(g.receivables_sen), "outstanding receivables", true)+
-      tile("We owe", rm0(g.payables_sen), "outstanding payables")+
-      (g.bank_complete
-        ? tile("In the bank", rm0(g.bank_sen), "across all accounts")
-        : tile("In the bank", g.bank_available_for ? rm0(g.bank_sen) : "not available",
-               g.bank_available_for ? g.bank_available_for+" of "+g.companies_connected+" companies" : "Xero permission needed"))+
-      tile("Net position", rm0(g.net_position_sen),
-           g.bank_complete ? "receivables + bank − payables" : "receivables − payables (bank not included)", true)+
-      tile("Overdue to us", rm0(g.overdue_receivables_sen), pctOf(g.overdue_receivables_sen,g.receivables_sen)+" of receivables")+
+      (pnl ? tile("Revenue", rm0(pnl.total.revenue_sen), "latest month on record") : "")+
+      (pnl ? tile("Net profit", rm0(pnl.total.net_profit_sen),
+             marginLabel(pnl.total), true) : "")+
+      tile("Owed to us", rm0(g.receivables_sen),
+           g.overdue_receivables_sen ? rm0(g.overdue_receivables_sen)+" overdue" : "none overdue")+
+      tile("We owe", rm0(g.payables_sen), "supplier bills outstanding")+
+      tile("In the bank", g.bank_available_for ? rm0(g.bank_sen) : "n/a",
+           g.bank_available_for ? g.bank_available_for+" compan"+(g.bank_available_for===1?"y":"ies")+" reporting" : "no bank feed")+
+      tile("Working capital", rm0(net), net>=0 ? "receivables over payables" : "payables over receivables")+
       "</div>";
 
-    html+='<div class="panel"><h2 style="font-size:16px">Who owes us — ageing</h2>'+
-      '<p class="sub">Outstanding customer invoices by how far past due they are.</p>'+
-      ageingBar(res.buckets, g.ar_ageing, g.receivables_sen)+"</div>";
+    // Anything that makes a headline figure untrustworthy is said before the figure is read,
+    // not in a footnote after it.
+    var flags=[];
+    // Each company that cannot plausibly have earned its margin says so in its own words,
+    // because the three ways of being wrong need three different answers.
+    if(pnl) pnl.companies.filter(function(c){return c.cost_warning;}).forEach(function(c){
+      flags.push("<strong>"+esc(c.company)+"</strong> shows "+esc(c.cost_warning)+
+        ". Treat its profit above as provisional.");
+    });
+    if(pnl && pnl.part_months && pnl.part_months.length){
+      flags.push("<strong>"+pnl.part_months.map(esc).join(", ")+
+        "</strong> has no closed month yet, so the figures shown are a month still in progress "+
+        "and are not comparable with the others.");
+    }
+    if(pnl && pnl.mixed_periods){
+      flags.push("The companies below are not all on the same month, because each is only as "+
+        "current as its last closed period. Each row states its own.");
+    }
+    if(!g.bank_available_for){
+      flags.push("No bank balance could be read, so cash is shown as unavailable rather than as zero.");
+    }
+    if(flags.length) html+='<div class="msg warn">'+flags.map(function(f){return "<div>"+f+"</div>";}).join('<div style="height:6px"></div>')+"</div>";
 
-    html+='<div class="panel"><h2 style="font-size:16px">What we owe — ageing</h2>'+
-      '<p class="sub">Outstanding supplier bills by how far past due they are.</p>'+
-      ageingBar(res.buckets, g.ap_ageing, g.payables_sen)+"</div>";
+    // ── trading, per company ───────────────────────────────────────────────────────────────
+    if(pnl && pnl.companies.length){
+      var maxRev=Math.max.apply(null,pnl.companies.map(function(c){return Math.max(c.revenue_sen,c.cos_sen+c.expenses_sen);}))||1;
+      html+='<div class="panel"><div class="row" style="margin-bottom:12px"><div class="grow">'+
+        '<h3 style="margin:0">Trading</h3>'+
+        '<p class="sub" style="margin:0">Revenue against cost, and what is left</p></div></div>'+
+        '<div class="tbl-wrap cards-on-phone" style="box-shadow:none;border:none"><table><thead><tr>'+
+        '<th>Company</th><th>Month</th><th class="num">Revenue</th><th class="num">Cost of sales</th>'+
+        '<th class="num">Expenses</th><th class="num">Net profit</th><th class="num">Margin</th>'+
+        '<th style="width:150px"></th></tr></thead><tbody>'+
+        pnl.companies.map(function(c){
+          // Two bars on one baseline: income above, cost below. The gap between them IS the
+          // profit, which reads faster than any number.
+          var rw=Math.round(c.revenue_sen/maxRev*100), cw=Math.round((c.cos_sen+c.expenses_sen)/maxRev*100);
+          return "<tr><td class='name'>"+esc(c.company)+"</td>"+
+            "<td data-label='Month'>"+esc(c.period)+
+              (c.part_month?' <span class="pill warn">part month</span>':"")+"</td>"+
+            "<td class='num' data-label='Revenue'>"+rm(c.revenue_sen)+"</td>"+
+            "<td class='num' data-label='Cost of sales'>"+rm(c.cos_sen)+"</td>"+
+            "<td class='num' data-label='Expenses'>"+rm(c.expenses_sen)+"</td>"+
+            "<td class='num' data-label='Net profit'><strong>"+rm(c.net_profit_sen)+"</strong></td>"+
+            "<td class='num' data-label='Margin'>"+(c.net_margin_bp===null?"—":(c.net_margin_bp/100).toFixed(1)+"%")+
+              (c.cost_warning?' <span class="pill bad" title="'+esc(c.cost_warning)+'">check costs</span>':"")+"</td>"+
+            "<td data-label='Shape'>"+
+              "<span style='display:block;height:6px;border-radius:3px;background:var(--ctg-blue);width:"+rw+"%;min-width:2px'></span>"+
+              "<span style='display:block;height:6px;border-radius:3px;background:var(--ctg-verm-lt);width:"+cw+"%;min-width:2px;margin-top:3px'></span>"+
+            "</td></tr>";
+        }).join("")+
+        "</tbody><tfoot><tr><td colspan='2'>Group</td>"+
+        "<td class='num' data-label='Revenue'>"+rm(pnl.total.revenue_sen)+"</td>"+
+        "<td class='num' data-label='Cost of sales'>"+rm(pnl.total.cos_sen)+"</td>"+
+        "<td class='num' data-label='Expenses'>"+rm(pnl.total.expenses_sen)+"</td>"+
+        "<td class='num' data-label='Net profit'>"+rm(pnl.total.net_profit_sen)+"</td>"+
+        "<td class='num' data-label='Margin'>"+marginPct(pnl.total)+"</td><td></td></tr></tfoot></table></div>"+
+        '<p class="fld-note" style="margin-top:8px">Blue is revenue, red is cost of sales plus '+
+        'expenses. Margin is net profit over total income, so other income cannot inflate it.</p>'+
+        "</div>";
+    }
 
-    // Per-company breakdown, always shown so the group total can be traced to its parts.
-    html+='<h2 style="font-size:16px;margin:24px 0 4px">By company</h2>'+
-      '<p class="sub">Every figure above, split by entity.</p>'+
-      '<div class="tbl-wrap"><table><thead><tr><th>Company</th><th class="num">Owed to us</th>'+
-      '<th class="num">Overdue</th><th class="num">We owe</th><th class="num">Bank</th>'+
-      '<th class="num">Net</th><th class="num">Open invoices</th></tr></thead><tbody>'+
-      res.companies.map((c)=>{
-        const net=c.receivables_sen+(c.bank_sen||0)-c.payables_sen;
-        return "<tr>"+
-          "<td class='name'>"+esc(c.short_name)+
-            (!c.connected?' <span class="pill warn">no Xero</span>':"")+
-            (c.error?' <span class="pill bad">error</span>':"")+"</td>"+
-          "<td class='num'>"+rm(c.receivables_sen)+"</td>"+
-          "<td class='num'>"+(c.overdue_receivables_sen?'<span style="color:var(--bad)">'+rm(c.overdue_receivables_sen)+"</span>":"—")+"</td>"+
-          "<td class='num'>"+rm(c.payables_sen)+"</td>"+
-          "<td class='num'>"+(c.bank_available ? rm(c.bank_sen) : '<span style="color:var(--ink-faint)" title="'+esc(c.bank_reason||"")+'">n/a</span>')+"</td>"+
-          "<td class='num'><strong>"+rm(net)+"</strong></td>"+
-          "<td class='num'>"+(c.invoice_counts.ar_open+c.invoice_counts.ap_open)+"</td>"+
-        "</tr>";
-      }).join("")+
-      "</tbody><tfoot><tr><td>Group</td>"+
-      "<td class='num'>"+rm(g.receivables_sen)+"</td>"+
-      "<td class='num'>"+rm(g.overdue_receivables_sen)+"</td>"+
-      "<td class='num'>"+rm(g.payables_sen)+"</td>"+
-      "<td class='num'>"+rm(g.bank_sen)+"</td>"+
-      "<td class='num'>"+rm(g.net_position_sen)+"</td>"+
-      "<td class='num'></td></tr></tfoot></table></div>";
+    // ── who owes us, and how late ──────────────────────────────────────────────────────────
+    html+='<div class="panel"><h3 style="margin:0 0 4px">Receivables by age</h3>'+
+      '<p class="sub" style="margin:0 0 12px">'+(g.overdue_receivables_sen
+        ? "<strong>"+rm0(g.overdue_receivables_sen)+"</strong> is past its due date"
+        : "Nothing is past its due date")+"</p>"+
+      ageingBars(res.buckets, g.ar_ageing, g.receivables_sen)+"</div>";
 
-    // Debtors and creditors, merged across whatever scope is selected.
-    const debtors=mergeParties(res.companies,"top_debtors");
-    const creditors=mergeParties(res.companies,"top_creditors");
-    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px" id="partyCols">'+
-      partyTable("Largest debtors","Who owes us the most",debtors,"owed")+
-      partyTable("Largest creditors","Who we owe the most",creditors,"owing")+
-      "</div>";
+    html+='<div class="panel"><h3 style="margin:0 0 4px">Payables by age</h3>'+
+      '<p class="sub" style="margin:0 0 12px">What we owe suppliers, oldest to the right</p>'+
+      ageingBars(res.buckets, g.ap_ageing, g.payables_sen)+"</div>";
+
+    // ── bank, per account: this is the reconciliation view ─────────────────────────────────
+    var withBank=res.companies.filter(function(c){return c.bank_available && (c.bank_accounts||[]).length;});
+    if(withBank.length){
+      html+='<div class="panel"><h3 style="margin:0 0 12px">Bank accounts</h3>'+
+        '<div class="tbl-wrap cards-on-phone" style="box-shadow:none;border:none"><table><thead><tr>'+
+        '<th>Account</th><th>Company</th><th class="num">Balance</th></tr></thead><tbody>'+
+        withBank.map(function(c){
+          return c.bank_accounts.map(function(a){
+            return "<tr><td class='name'>"+esc(a.name)+"</td>"+
+              "<td data-label='Company'>"+esc(c.short_name)+"</td>"+
+              "<td class='num' data-label='Balance'>"+rm(a.balance_sen)+"</td></tr>";
+          }).join("");
+        }).join("")+
+        "</tbody><tfoot><tr><td colspan='2'>Total</td><td class='num' data-label='Total'>"+rm(g.bank_sen)+"</td></tr></tfoot>"+
+        "</table></div></div>";
+    }
+    var noBank=res.companies.filter(function(c){return !c.bank_available;});
+    if(noBank.length){
+      html+='<div class="msg"><strong>No bank balance for '+
+        noBank.map(function(c){return esc(c.short_name);}).join(", ")+".</strong> "+
+        esc(noBank[0].bank_reason||"The Xero report could not be read.")+
+        " Cash is shown as unavailable rather than as zero, so it cannot be mistaken for an empty account.</div>";
+    }
+
+    // ── people ────────────────────────────────────────────────────────────────────────────
+    if(pay){
+      html+='<div class="panel"><div class="row" style="margin-bottom:12px"><div class="grow">'+
+        '<h3 style="margin:0">People</h3><p class="sub" style="margin:0">'+esc(pay.period)+
+        ' · '+pay.headcount+' paid</p></div></div>'+
+        '<div class="tiles" style="margin-bottom:14px">'+
+        tile("Employment cost", rm0(pay.employment_cost_sen), "gross + employer statutory")+
+        tile("Net pay", rm0(pay.net_sen), "to bank accounts")+
+        tile("Basic pay", rm0(pay.basic_sen), "before components")+
+        tile("HRD Corp", rm0(pay.hrdf_sen), "1% of basic")+
+        "</div>"+
+        (pay.top_centres.length
+          ? '<div class="tbl-wrap cards-on-phone" style="box-shadow:none;border:none"><table><thead><tr>'+
+            '<th>Where the people are</th><th class="num">Head</th><th style="width:150px"></th>'+
+            '</tr></thead><tbody>'+
+            pay.top_centres.map(function(c){
+              var w=Math.round(c.headcount/pay.headcount*100);
+              return "<tr><td class='name'>"+esc(c.name)+"</td>"+
+                "<td class='num' data-label='Head'>"+c.headcount.toFixed(1)+"</td>"+
+                "<td data-label='Share'><span style='display:block;height:7px;border-radius:4px;"+
+                "background:var(--brandwash);width:"+w+"%;min-width:2px'></span></td></tr>";
+            }).join("")+"</tbody></table></div>" : "")+
+        "</div>";
+    }
+
+    // ── O2O ───────────────────────────────────────────────────────────────────────────────
+    if(o2o){
+      html+='<div class="panel"><div class="row" style="margin-bottom:12px"><div class="grow">'+
+        '<h3 style="margin:0">O2O pharmacy billing</h3><p class="sub" style="margin:0">'+esc(o2o.period)+"</p></div>"+
+        (o2o.reconciled===false?'<span class="pill bad">does not reconcile</span>'
+         :o2o.reconciled?'<span class="pill good"><span class="dot"></span>reconciles</span>':"")+
+        (o2o.status==="issued"?'<span class="pill good">issued</span>':'<span class="pill warn">draft</span>')+
+        "</div>"+
+        '<div class="tiles" style="margin-bottom:14px">'+
+        tile("To bill", rm0(o2o.billing_sen), "after trade discount")+
+        tile("Invoices issued", String(o2o.invoices_issued), "in Xero")+
+        tile("Brands", String(o2o.brands.length), "billing this month")+
+        "</div>"+
+        '<div class="tbl-wrap cards-on-phone" style="box-shadow:none;border:none"><table><thead><tr>'+
+        '<th>Brand</th><th class="num">Billing</th><th style="width:150px"></th></tr></thead><tbody>'+
+        o2o.brands.map(function(bd){
+          var w=o2o.billing_sen?Math.round(bd.billing_sen/o2o.billing_sen*100):0;
+          return "<tr><td class='name'>"+esc(bd.brand)+"</td>"+
+            "<td class='num' data-label='Billing'>"+rm(bd.billing_sen)+"</td>"+
+            "<td data-label='Share'><span style='display:block;height:7px;border-radius:4px;"+
+            "background:var(--brandwash);width:"+w+"%;min-width:2px'></span></td></tr>";
+        }).join("")+"</tbody></table></div></div>";
+    }
+
+    // ── per company, the one-line summary ─────────────────────────────────────────────────
+    if(res.companies.length>1){
+      html+='<div class="panel"><h3 style="margin:0 0 12px">By company</h3>'+
+        '<div class="tbl-wrap cards-on-phone" style="box-shadow:none;border:none"><table><thead><tr>'+
+        '<th>Company</th><th class="num">Owed to us</th><th class="num">Overdue</th>'+
+        '<th class="num">We owe</th><th class="num">Bank</th><th class="num">Working capital</th>'+
+        '</tr></thead><tbody>'+
+        res.companies.map(function(c){
+          return "<tr><td class='name'>"+esc(c.short_name)+"</td>"+
+            "<td class='num' data-label='Owed to us'>"+rm(c.receivables_sen)+"</td>"+
+            "<td class='num' data-label='Overdue'>"+(c.overdue_receivables_sen
+              ? '<span style="color:var(--bad)">'+rm(c.overdue_receivables_sen)+"</span>" : "—")+"</td>"+
+            "<td class='num' data-label='We owe'>"+rm(c.payables_sen)+"</td>"+
+            "<td class='num' data-label='Bank'>"+(c.bank_available?rm(c.bank_sen):'<span style="color:var(--ink-faint)">n/a</span>')+"</td>"+
+            "<td class='num' data-label='Working capital'><strong>"+rm(c.receivables_sen-c.payables_sen)+"</strong></td></tr>";
+        }).join("")+"</tbody></table></div></div>";
+    }
 
     box.innerHTML=html;
-    if (window.matchMedia("(max-width:760px)").matches){
-      const pc=$("partyCols"); if(pc) pc.style.gridTemplateColumns="1fr";
-    }
+  }
+
+  function marginPct(t){
+    var income=t.revenue_sen+(t.other_income_sen||0);
+    return income ? (t.net_profit_sen/income*100).toFixed(1)+"%" : "—";
+  }
+  function marginLabel(t){
+    var income=t.revenue_sen+(t.other_income_sen||0);
+    return income ? "margin "+marginPct(t) : "no income recorded";
+  }
+
+  /** Ageing as a row of bars on a shared scale, because "how bad is the tail" is a shape
+   *  question and a table of five numbers does not answer it at a glance. */
+  function ageingBars(buckets, ageing, total){
+    var max=Math.max.apply(null,buckets.map(function(b){return Math.abs(ageing[b.key]||0);}))||1;
+    // Current is calm; the further overdue, the hotter — amber then vermilion.
+    var colour=["var(--ctg-blue)","var(--ctg-blue-lt)","var(--ctg-amber)","var(--ctg-amber-lt)","var(--ctg-verm)"];
+    return '<div style="display:grid;grid-template-columns:repeat('+buckets.length+
+      ',1fr);gap:8px;align-items:end;min-height:96px">'+
+      buckets.map(function(b,i){
+        var v=ageing[b.key]||0, h=Math.max(3,Math.round(Math.abs(v)/max*76));
+        var share=total?Math.round(v/total*100):0;
+        return '<div style="text-align:center">'+
+          '<div class="num" style="font-size:12.5px;font-weight:700;margin-bottom:5px;white-space:nowrap">'+rm0(v)+"</div>"+
+          '<div style="height:'+h+'px;border-radius:6px 6px 0 0;background:'+colour[i%colour.length]+'"></div>'+
+          '<div style="font-size:10.5px;color:var(--ink-faint);margin-top:6px;font-weight:600">'+esc(b.label)+"</div>"+
+          '<div style="font-size:10px;color:var(--ink-faint)">'+share+"%</div>"+
+          "</div>";
+      }).join("")+"</div>";
   }
 
   function pctOf(part,whole){
@@ -768,17 +1036,17 @@
         ', so their cost lands nowhere. Import that month\u2019s intake listing.</div>';
     }
 
-    html+='<div class="tbl-wrap"><table><thead><tr><th>No.</th><th>Name</th><th>Employer</th>'+
+    html+='<div class="tbl-wrap cards-on-phone"><table><thead><tr><th>No.</th><th>Name</th><th>Employer</th>'+
       '<th>Projects carrying the cost</th><th>Joined</th><th>Status</th>'+
       (feat("payroll_individual")?"<th></th>":"")+'</tr></thead><tbody>'+
       res.employees.map(function(e){
         return "<tr>"+
-          "<td class='mono'>"+esc(e.emp_no||"—")+"</td>"+
+          "<td class='mono' data-label='No.'>"+esc(e.emp_no||"—")+"</td>"+
           "<td class='name'>"+esc(e.name)+
             (nickWorthShowing(e.name,e.nickname)?' <span class="sub">'+esc(e.nickname)+"</span>":"")+
             (e.note?'<div class="fld-note">'+esc(e.note)+"</div>":"")+"</td>"+
-          "<td>"+esc(e.employer||"—")+"</td>"+
-          "<td style='white-space:normal'>"+(e.projects.length
+          "<td data-label='Employer'>"+esc(e.employer||"—")+"</td>"+
+          "<td style='white-space:normal' data-label='Projects'>"+(e.projects.length
             ? e.projects.map(function(p){
                 // The owning company is shown beside each project, because it is routinely NOT
                 // the employer -- the Account department is employed by CTG JV Malaysia while
@@ -790,8 +1058,8 @@
                   (cross?"\u2192 "+esc(p.owner):"")+"</span>";
               }).join("")
             : '<span style="color:var(--bad)">none</span>')+"</td>"+
-          "<td>"+esc(e.join_date||"—")+"</td>"+
-          "<td>"+(e.status==="active"?'<span class="pill good"><span class="dot"></span>active</span>'
+          "<td data-label='Joined'>"+esc(e.join_date||"—")+"</td>"+
+          "<td data-label='Status'>"+(e.status==="active"?'<span class="pill good"><span class="dot"></span>active</span>'
                  :'<span class="pill mute">'+esc(e.status)+"</span>")+"</td>"+
           (feat("payroll_individual")
             ? "<td><button class='link empPay' data-id='"+esc(e.id)+"' data-n='"+esc(e.name)+"'>Pay history</button></td>"
@@ -978,7 +1246,7 @@
         'Each figure below was recomputed from the employee rows, not read off a summary line.</div>';
     }
 
-    html+='<div class="tbl-wrap"><table><thead><tr><th>Company</th><th class="num">Head</th>'+
+    html+='<div class="tbl-wrap cards-on-phone"><table><thead><tr><th>Company</th><th class="num">Head</th>'+
       '<th class="num">Basic</th><th class="num">Gross</th><th class="num">EPF</th>'+
       '<th class="num">SOCSO</th><th class="num">EIS</th><th class="num">PCB</th>'+
       '<th class="num">HRD Corp</th><th class="num">Net pay</th><th class="num">Out of bank</th>'+
@@ -986,12 +1254,16 @@
       res.companies.map(function(c){
         return "<tr><td class='name'>"+esc(c.company)+
           (c.source==="imported"?' <span class="pill mute">imported</span>':"")+"</td>"+
-          "<td class='num'>"+c.headcount+"</td><td class='num'>"+rm(c.basic_sen)+"</td>"+
-          "<td class='num'>"+rm(c.gross_sen)+"</td><td class='num'>"+rm(c.epf_sen)+"</td>"+
-          "<td class='num'>"+rm(c.socso_sen)+"</td><td class='num'>"+rm(c.eis_sen)+"</td>"+
-          "<td class='num'>"+rm(c.pcb_sen)+"</td><td class='num'>"+rm(c.hrdf_sen)+"</td>"+
-          "<td class='num'>"+rm(c.net_sen)+"</td>"+
-          "<td class='num'><strong>"+rm(c.bank_total_sen)+"</strong></td></tr>";
+          "<td class='num' data-label='Head'>"+c.headcount+"</td>"+
+          "<td class='num' data-label='Basic'>"+rm(c.basic_sen)+"</td>"+
+          "<td class='num' data-label='Gross'>"+rm(c.gross_sen)+"</td>"+
+          "<td class='num' data-label='EPF'>"+rm(c.epf_sen)+"</td>"+
+          "<td class='num' data-label='SOCSO'>"+rm(c.socso_sen)+"</td>"+
+          "<td class='num' data-label='EIS'>"+rm(c.eis_sen)+"</td>"+
+          "<td class='num' data-label='PCB'>"+rm(c.pcb_sen)+"</td>"+
+          "<td class='num' data-label='HRD Corp'>"+rm(c.hrdf_sen)+"</td>"+
+          "<td class='num' data-label='Net pay'>"+rm(c.net_sen)+"</td>"+
+          "<td class='num' data-label='Out of bank'><strong>"+rm(c.bank_total_sen)+"</strong></td></tr>";
       }).join("")+
       "</tbody><tfoot><tr><td>Group</td><td class='num'>"+t.headcount+"</td>"+
       "<td class='num'>"+rm(t.basic_sen)+"</td><td class='num'>"+rm(t.gross_sen)+"</td>"+
@@ -1291,6 +1563,228 @@
     });
   }
 
+
+  // ── who can sign in ─────────────────────────────────────────────────────────────────────
+
+  /** Nobody here ever chooses somebody else's password. An invite carries a one-time code, the
+   *  person opens it and sets their own, and whoever invited them never learns it. */
+  async function renderUsers(v){
+    v.innerHTML='<div class="row" style="margin-bottom:14px"><div class="grow">'+
+      '<h2>People &amp; access</h2><p class="sub" style="margin:0">Who can sign in, as what, and to which companies</p></div>'+
+      '<button class="btn btn-sm" id="invBtn">Invite someone</button></div>'+
+      '<div id="usrBody"><p class="empty">Loading…</p></div>';
+    var res=await API.call("users_list",{});
+    var box=$("usrBody");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    $("invBtn").onclick=function(){ inviteModal(res); };
+
+    var salaryRoles=res.roles.filter(function(r){return r.sees_salary;});
+    var withSalary=res.users.filter(function(u){return u.sees_salary;});
+
+    var html='<div class="tiles">'+
+      tile("People with access", String(res.users.length), "active accounts")+
+      tile("Can see salary", String(withSalary.length),
+           withSalary.length===1?"only "+esc(withSalary[0].name.split(" ")[0]):"review this")+
+      tile("Two-factor on", String(res.users.filter(function(u){return u.two_factor;}).length),
+           "of "+res.users.length)+
+      tile("Open invites", String(res.invites.filter(function(i){return i.state==="open";}).length), "not yet claimed")+
+      "</div>";
+
+    // Salary access is the thing worth stating plainly on this page, every time it loads.
+    html+='<div class="msg'+(withSalary.length>1?" warn":"")+'"><strong>'+
+      (withSalary.length===1
+        ? esc(withSalary[0].name)+" is the only person who can see salary figures."
+        : withSalary.length===0
+          ? "Nobody can currently see salary figures."
+          : withSalary.length+" people can see salary figures: "+withSalary.map(function(u){return esc(u.name);}).join(", ")+".")+
+      "</strong> Salary is restricted by role, and a role without it cannot obtain a pay figure "+
+      "from the system at all — not an individual one and not a total. Roles that do expose pay: "+
+      salaryRoles.map(function(r){return esc(r.label);}).join(", ")+".</div>";
+
+    html+='<div class="tbl-wrap cards-on-phone"><table><thead><tr><th>Name</th><th>Email</th>'+
+      '<th>Role</th><th>Companies</th><th>Salary</th><th>2FA</th><th>Status</th><th></th>'+
+      '</tr></thead><tbody>'+
+      res.users.map(function(u){
+        return "<tr><td class='name'>"+esc(u.name)+"</td>"+
+          "<td data-label='Email' style='white-space:normal'>"+esc(u.email)+"</td>"+
+          "<td data-label='Role'>"+esc(u.role_label)+(u.manage_users?' <span class="pill mute">admin</span>':"")+"</td>"+
+          "<td data-label='Companies' style='white-space:normal'>"+
+            (u.all_companies?'<span class="pill mute">all</span>'
+             : u.companies.length?u.companies.map(esc).join(", ")
+             :'<span style="color:var(--bad)">none</span>')+"</td>"+
+          "<td data-label='Salary'>"+(u.sees_salary
+            ?'<span class="pill warn">can see pay</span>':'<span class="pill mute">no</span>')+"</td>"+
+          "<td data-label='2FA'>"+(u.two_factor?'<span class="pill good"><span class="dot"></span>on</span>'
+            :'<span class="pill mute">off</span>')+"</td>"+
+          "<td data-label='Status'>"+(u.status==="active"
+            ?'<span class="pill good"><span class="dot"></span>active</span>'
+            :'<span class="pill bad">disabled</span>')+"</td>"+
+          "<td><button class='link usrEdit' data-id='"+esc(u.id)+"'>Change</button></td></tr>";
+      }).join("")+"</tbody></table></div>";
+
+    var openInv=res.invites.filter(function(i){return i.state!=="claimed";});
+    if(openInv.length){
+      html+='<div class="panel" style="margin-top:18px"><h3 style="margin:0 0 10px">Invites</h3>'+
+        '<div class="tbl-wrap cards-on-phone" style="box-shadow:none;border:none"><table><thead><tr>'+
+        '<th>Name</th><th>Email</th><th>Role</th><th>State</th><th></th></tr></thead><tbody>'+
+        openInv.map(function(i){
+          return "<tr><td class='name'>"+esc(i.name)+"</td>"+
+            "<td data-label='Email' style='white-space:normal'>"+esc(i.email)+"</td>"+
+            "<td data-label='Role'>"+esc(i.role)+"</td>"+
+            "<td data-label='State'>"+(i.state==="open"?'<span class="pill warn">waiting</span>'
+              :'<span class="pill mute">'+esc(i.state)+"</span>")+"</td>"+
+            "<td>"+(i.state==="open"?"<button class='link invRev' data-id='"+esc(i.id)+"'>Revoke</button>":"")+"</td></tr>";
+        }).join("")+"</tbody></table></div>"+
+        '<p class="fld-note" style="margin-top:8px">An invite code is shown once when it is created '+
+        'and only its hash is stored, so it cannot be looked up later. Revoke and re-invite instead.</p>'+
+        "</div>";
+    }
+
+    box.innerHTML=html;
+    box.querySelectorAll("button.usrEdit").forEach(function(b){
+      b.onclick=function(){ userEditModal(res, res.users.find(function(u){return u.id===b.dataset.id;})); };
+    });
+    box.querySelectorAll("button.invRev").forEach(function(b){
+      b.onclick=async function(){
+        if(!confirm("Revoke this invite? The code stops working immediately.")) return;
+        var r=await API.call("user_invite_revoke",{ invite_id:b.dataset.id });
+        if(!r.ok) return alert(AUTH.friendlyError(r.error));
+        toast("Invite revoked"); render();
+      };
+    });
+  }
+
+  function roleOptions(roles, selected){
+    return roles.map(function(r){
+      return '<option value="'+esc(r.name)+'"'+(r.name===selected?" selected":"")+">"+esc(r.label)+
+        (r.sees_salary?" — can see salary":"")+(r.read_only?" (view only)":"")+"</option>";
+    }).join("");
+  }
+
+  function inviteModal(data){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    // The default offered is a role that CANNOT see pay. Granting salary should take a
+    // deliberate action, never be what happens if you accept the defaults.
+    var def=data.safe_default_role||"";
+    bg.innerHTML='<div class="modal" style="max-width:560px"><h3>Invite someone</h3>'+
+      '<div id="invMsg" class="msg err hide"></div>'+
+      '<p class="sub">They set their own password. You will get a one-time code to pass on — '+
+      'you never see their password and cannot sign in as them.</p>'+
+      '<div class="fields">'+
+        '<div><label>Name</label><input id="v_name" placeholder="Full name"></div>'+
+        '<div><label>Email</label><input id="v_email" inputmode="email" placeholder="name@ctg.com"></div>'+
+        '<div class="full"><label>Role</label><select id="v_role">'+roleOptions(data.roles,def)+"</select>"+
+          '<div class="fld-note" id="v_roleNote"></div></div>'+
+        '<div class="full" id="v_coWrap"><label>Companies they can see</label>'+
+          '<div style="display:grid;gap:6px;margin-top:4px">'+
+          COMPANIES.map(function(c){
+            return '<label class="check"><input type="checkbox" class="v_co" value="'+esc(c.id)+'"> '+esc(c.short_name)+"</label>";
+          }).join("")+"</div></div>"+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="invCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="invGo">Create invite</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#invCancel").onclick=function(){ bg.remove(); };
+
+    function syncRole(){
+      var r=data.roles.find(function(x){return x.name===bg.querySelector("#v_role").value;});
+      var note=bg.querySelector("#v_roleNote");
+      note.innerHTML = r
+        ? esc(r.description||"")+(r.sees_salary
+            ? '<strong style="color:var(--bad)"> This role can see salary figures.</strong>' : "")
+        : "";
+      // A role that sees every company has nothing to pick.
+      bg.querySelector("#v_coWrap").style.display = (r && r.manage_users) ? "none" : "";
+    }
+    bg.querySelector("#v_role").onchange=syncRole; syncRole();
+
+    bg.querySelector("#invGo").onclick=async function(){
+      var m=bg.querySelector("#invMsg"); m.className="msg err hide";
+      var role=bg.querySelector("#v_role").value;
+      var r=data.roles.find(function(x){return x.name===role;});
+      var ids=[].slice.call(bg.querySelectorAll(".v_co:checked")).map(function(x){return x.value;});
+      if(r && r.sees_salary && !confirm(r.label+" can see salary figures. Invite them to this role?")) return;
+      var btn=bg.querySelector("#invGo"); btn.disabled=true; btn.textContent="Creating…";
+      var res=await API.call("user_invite",{
+        name:bg.querySelector("#v_name").value.trim(),
+        email:bg.querySelector("#v_email").value.trim(),
+        role:role, company_ids:ids,
+      });
+      btn.disabled=false; btn.textContent="Create invite";
+      if(!res.ok){ m.textContent=AUTH.friendlyError(res.error); m.className="msg err"; return; }
+      // The code is shown once, so it is displayed large and copyable rather than in a toast.
+      bg.querySelector(".modal").innerHTML='<h3>Invite created</h3>'+
+        '<p class="sub">Give this code to '+esc(res.name)+' yourself. It is shown once and cannot be '+
+        'looked up again — only its hash is stored.</p>'+
+        '<div class="panel" style="text-align:center;margin:14px 0"><div class="num" '+
+        'style="font-size:22px;font-weight:700;letter-spacing:.06em;word-break:break-all">'+esc(res.code)+"</div></div>"+
+        '<p class="fld-note">They open the portal, choose “I have an invite code”, and set their own '+
+        'password. Expires '+esc(new Date(res.expires_at).toLocaleDateString("en-MY",{dateStyle:"medium"}))+".</p>"+
+        (res.warning?'<div class="msg warn">'+esc(res.warning)+"</div>":"")+
+        '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="invCopy">Copy code</button>'+
+        '<button class="btn btn-sm" id="invDone">Done</button></div>';
+      bg.querySelector("#invCopy").onclick=function(){
+        navigator.clipboard.writeText(res.code).then(function(){ toast("Code copied"); });
+      };
+      bg.querySelector("#invDone").onclick=function(){ bg.remove(); render(); };
+    };
+  }
+
+  function userEditModal(data, u){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:520px"><h3>'+esc(u.name)+"</h3>"+
+      '<div id="ueMsg" class="msg err hide"></div>'+
+      '<p class="sub">'+esc(u.email)+"</p>"+
+      '<div class="fields">'+
+        '<div class="full"><label>Role</label><select id="e_role">'+roleOptions(data.roles,u.role)+"</select>"+
+          '<div class="fld-note" id="e_roleNote"></div></div>'+
+        '<div class="full"><label>Status</label><select id="e_status">'+
+          '<option value="active"'+(u.status==="active"?" selected":"")+">Active</option>"+
+          '<option value="disabled"'+(u.status!=="active"?" selected":"")+">Disabled — signs them out now</option>"+
+          "</select></div>"+
+        '<div class="full" id="e_coWrap"><label>Companies they can see</label>'+
+          '<div style="display:grid;gap:6px;margin-top:4px">'+
+          COMPANIES.map(function(c){
+            return '<label class="check"><input type="checkbox" class="e_co" value="'+esc(c.id)+'"'+
+              (u.companies.indexOf(c.short_name)>=0?" checked":"")+"> "+esc(c.short_name)+"</label>";
+          }).join("")+"</div></div>"+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="ueCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="ueSave">Save</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#ueCancel").onclick=function(){ bg.remove(); };
+
+    function syncRole(){
+      var r=data.roles.find(function(x){return x.name===bg.querySelector("#e_role").value;});
+      bg.querySelector("#e_roleNote").innerHTML = r
+        ? esc(r.description||"")+(r.sees_salary
+            ? '<strong style="color:var(--bad)"> This role can see salary figures.</strong>':"")
+        : "";
+      bg.querySelector("#e_coWrap").style.display=(r && r.manage_users)?"none":"";
+    }
+    bg.querySelector("#e_role").onchange=syncRole; syncRole();
+
+    bg.querySelector("#ueSave").onclick=async function(){
+      var m=bg.querySelector("#ueMsg"); m.className="msg err hide";
+      var role=bg.querySelector("#e_role").value;
+      var r=data.roles.find(function(x){return x.name===role;});
+      if(r && r.sees_salary && !u.sees_salary &&
+         !confirm("This gives "+u.name+" access to salary figures. Continue?")) return;
+      var btn=bg.querySelector("#ueSave"); btn.disabled=true; btn.textContent="Saving…";
+      var res=await API.call("user_update",{
+        user_id:u.id, role:role, status:bg.querySelector("#e_status").value,
+        company_ids:[].slice.call(bg.querySelectorAll(".e_co:checked")).map(function(x){return x.value;}),
+      });
+      btn.disabled=false; btn.textContent="Save";
+      if(!res.ok){ m.textContent=AUTH.friendlyError(res.error); m.className="msg err"; return; }
+      bg.remove();
+      toast(res.sessions_ended ? "Saved · signed them out" : "Saved");
+      render();
+    };
+  }
+
   function tile(k,v,m,accent){
     return '<div class="tile'+(accent?" accent":"")+'"><div class="k">'+esc(k)+'</div><div class="v num">'+esc(v)+"</div>"+
            (m?'<div class="m">'+esc(m)+"</div>":"")+"</div>";
@@ -1520,15 +2014,17 @@
 
     // Cost per project, with a bar so the shape reads before the numbers do.
     var max=Math.max.apply(null,res.projects.map(function(p){return p.loaded_sen;}));
-    html+='<div class="tbl-wrap"><table><thead><tr><th>Project</th><th>Owning company</th>'+
+    html+='<div class="tbl-wrap cards-on-phone"><table><thead><tr><th>Project</th><th>Owning company</th>'+
       '<th class="num">Head</th><th class="num">Basic</th><th class="num">Gross</th>'+
       '<th class="num">Employment cost</th><th style="width:170px"></th></tr></thead><tbody>'+
       res.projects.map(function(p){
         var pct=max?Math.round(p.loaded_sen/max*100):0;
-        return "<tr><td class='name'>"+esc(p.project)+"</td><td>"+esc(p.owner||"—")+"</td>"+
-          "<td class='num'>"+p.headcount.toFixed(1)+"</td>"+
-          "<td class='num'>"+rm(p.basic_sen)+"</td><td class='num'>"+rm(p.gross_sen)+"</td>"+
-          "<td class='num'><strong>"+rm(p.loaded_sen)+"</strong></td>"+
+        return "<tr><td class='name'>"+esc(p.project)+"</td>"+
+          "<td data-label='Owner'>"+esc(p.owner||"—")+"</td>"+
+          "<td class='num' data-label='Head'>"+p.headcount.toFixed(1)+"</td>"+
+          "<td class='num' data-label='Basic'>"+rm(p.basic_sen)+"</td>"+
+          "<td class='num' data-label='Gross'>"+rm(p.gross_sen)+"</td>"+
+          "<td class='num' data-label='Employment cost'><strong>"+rm(p.loaded_sen)+"</strong></td>"+
           "<td><span style='display:block;height:7px;border-radius:4px;background:var(--brandwash);"+
           "width:"+pct+"%;min-width:2px'></span></td></tr>";
       }).join("")+
