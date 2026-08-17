@@ -900,9 +900,11 @@
       '<div class="row" style="margin-bottom:16px"><div class="grow">'+
       '<h2>O2O invoicing</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+
       ' — import a month of pharmacy sales, then raise one invoice per pharmacy.</p></div>'+
-      '<button class="btn btn-sm" id="newBatch">Import sales file</button></div>'+
+      '<button class="btn btn-sm btn-ghost" id="newBatch">Import CSV</button>'+
+      '<button class="btn btn-sm" id="newWb">Import billing workbook</button></div>'+
       '<div id="batchList"><p class="empty">Loading…</p></div>';
     $("newBatch").onclick = importModal;
+    $("newWb").onclick = workbookModal;
 
     const res = await API.call("o2o_batches_list", { company_id: ACTIVE.id });
     const box=$("batchList");
@@ -979,6 +981,101 @@
     };
   }
 
+  // ── billing workbook import ──────────────────────────────────────────────────────────
+  // SheetJS is vendored rather than pulled from a CDN, and loaded only when someone actually
+  // opens this modal: 273KB has no business slowing down the dashboard, and a month-end that
+  // depends on a CDN being reachable is a month-end that eventually fails.
+  var XLSX_READY=null, WB_NO_SALES=null;
+  function loadXlsx(){
+    if(XLSX_READY) return XLSX_READY;
+    XLSX_READY=new Promise(function(res,rej){
+      var s=document.createElement("script");
+      s.src="vendor/xlsx.mini.min.js";
+      s.onload=function(){
+        try{ if(typeof make_xlsx_lib==="function" && !XLSX.utils) make_xlsx_lib(XLSX); }catch(e){}
+        (typeof XLSX!=="undefined" && XLSX.read) ? res(XLSX)
+          : rej(new Error("the spreadsheet reader loaded but did not start"));
+      };
+      s.onerror=function(){ rej(new Error("could not load the spreadsheet reader")); };
+      document.head.appendChild(s);
+    });
+    return XLSX_READY;
+  }
+
+  function workbookModal(){
+    var now=new Date();
+    var years=[]; for(var y=now.getFullYear()+1;y>=now.getFullYear()-2;y--) years.push(y);
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:620px"><h3>Import the O2O billing workbook</h3>'+
+      '<div id="wbMsg" class="msg err hide"></div>'+
+      '<p class="sub">The monthly workbook exactly as the O2O team keeps it — one tab per pharmacy, '+
+      'a block per brand. Every brand block is recomputed from its own rows and checked against the '+
+      'figure typed on the sheet, so a keying slip shows up here rather than on an invoice. '+
+      'Samples, testers, FOC and replacement rows are left off the billing.</p>'+
+      '<div class="fields">'+
+        '<div><label>Month</label><select id="w_month">'+MONTHS.map(function(m,i){
+          return '<option value="'+(i+1)+'"'+(i+1===now.getMonth()+1?" selected":"")+">"+m+"</option>"; }).join("")+"</select></div>"+
+        '<div><label>Year</label><select id="w_year">'+years.map(function(y){
+          return '<option'+(y===now.getFullYear()?" selected":"")+">"+y+"</option>"; }).join("")+"</select></div>"+
+        '<div><label>Invoice date</label><input type="date" id="w_date" value="'+
+          new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10)+'"></div>'+
+        '<div><label>Payment terms (days)</label><input id="w_due" value="30"></div>'+
+        '<div class="full"><label>Fallback revenue account in Xero</label>'+
+          '<input id="w_acct" placeholder="e.g. 200">'+
+          '<div class="fld-note">Used for brands that do not have their own account code set. '+
+          'Leave blank to let Xero use the contact default.</div></div>'+
+        '<div class="full"><label>Workbook (.xlsx)</label><input type="file" id="w_file" accept=".xlsx"></div>'+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="wbCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="wbGo">Read workbook</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#wbCancel").onclick=function(){ bg.remove(); };
+
+    bg.querySelector("#wbGo").onclick=async function(){
+      var f=bg.querySelector("#w_file").files[0];
+      var m=bg.querySelector("#wbMsg"); m.classList.add("hide");
+      if(!f){ m.textContent="Choose the workbook first."; m.classList.remove("hide"); return; }
+      var btn=bg.querySelector("#wbGo"); btn.disabled=true;
+      var fail=function(msg){ btn.disabled=false; btn.textContent="Read workbook";
+        m.textContent=msg; m.classList.remove("hide"); };
+      try{
+        btn.textContent="Loading reader…";
+        var X=await loadXlsx();
+        btn.textContent="Reading sheets…";
+        var buf=await f.arrayBuffer();
+        // raw:true keeps dates as Excel serial numbers, which the parser converts itself --
+        // letting the browser's locale interpret them is how 07/06 becomes the wrong month.
+        var wb=X.read(new Uint8Array(buf),{type:"array",cellDates:false});
+        var sheets={};
+        wb.SheetNames.forEach(function(n){
+          sheets[n]=X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true});
+        });
+        btn.textContent="Checking figures…";
+        var res=await API.call("o2o_import_workbook",{
+          company_id:ACTIVE.id,
+          year:parseInt(bg.querySelector("#w_year").value,10),
+          month:parseInt(bg.querySelector("#w_month").value,10),
+          invoice_date:bg.querySelector("#w_date").value||null,
+          due_days:parseInt(bg.querySelector("#w_due").value,10)||30,
+          default_account_code:bg.querySelector("#w_acct").value.trim()||null,
+          source_name:f.name, sheets:sheets,
+        });
+        if(!res.ok) return fail(AUTH.friendlyError(res.error));
+        bg.remove();
+        var rc=res.reconciliation;
+        toast(res.pharmacies_billable+" pharmacies to bill · "+res.blocks+" brand blocks · "+
+              (rc.blocks_off?rc.blocks_off+" DO NOT RECONCILE":"all figures reconcile"));
+        // Tabs with no sales are worth naming: nothing distinguishes "sold nothing this month"
+        // from "nobody filled this in", and the second one silently under-bills.
+        if(res.pharmacies_with_no_sales && res.pharmacies_with_no_sales.length){
+          WB_NO_SALES=res.pharmacies_with_no_sales;
+        } else { WB_NO_SALES=null; }
+        O2O_BATCH=res.batch_id; render();
+      }catch(err){ fail(String(err&&err.message||err)); }
+    };
+  }
+
   async function renderO2OBatch(v, batchId){
     v.innerHTML='<button class="link" id="backBtn">← All imports</button>'+
       '<div id="bBody" style="margin-top:12px"><p class="empty">Loading…</p></div>';
@@ -994,13 +1091,64 @@
       '<p class="sub" style="margin:0">'+esc(b.source_name||"imported file")+"</p></div>"+
       (b.status==="issued"?'<span class="pill good">issued</span>':"")+"</div>";
 
+    var isWb = b.source_kind==="workbook";
+
     html+='<div class="tiles">'+
       tile("Pharmacies", String(t.pharmacies), "one invoice each")+
+      (isWb ? tile("Brands", String(t.brands||0), "across all pharmacies") : "")+
       tile("Sales lines", String(t.lines), "")+
-      tile("Batch value", rm0(t.total_sen), "before tax", true)+
+      (isWb ? tile("Gross sales", rm0(t.gross_sen||0), "at promo prices") : "")+
+      (isWb ? tile("Trade discount", "−"+rm0(t.discount_sen||0), "taken per brand") : "")+
+      tile(isWb?"To invoice":"Batch value", rm0(t.total_sen), "before tax", true)+
       tile("Needs a contact", String(t.unlinked), t.unlinked? "cannot invoice until linked":"all linked")+
       tile("Already issued", String(t.already_issued), "in Xero")+
       "</div>";
+
+    // The reconciliation is the point of the workbook import, so it reads before anything else.
+    if(isWb && res.reconciliation){
+      var rc=res.reconciliation;
+      if(rc.blocks_off){
+        html+='<div class="msg err"><strong>'+rc.blocks_off+' of '+rc.blocks_checked+
+          ' brand blocks do not add up to the figure typed on the sheet</strong> — out by '+
+          rm(rc.variance_total_sen)+' in total. Every summary figure in that workbook is keyed by '+
+          'hand, so this is where a slip shows. Check these before issuing anything:'+
+          '<ul style="margin:8px 0 0 18px">'+rc.worst.map(function(w){
+            return "<li>"+esc(w.pharmacy)+" · "+esc(w.brand)+" — sheet says "+rm(w.sheet_billing_sen)+
+                   ", its own rows come to "+rm(w.computed_billing_sen)+" ("+rm(w.variance_sen)+")</li>";
+          }).join("")+"</ul></div>";
+      } else if (rc.blocks_checked) {
+        html+='<div class="msg good"><strong>All '+rc.blocks_checked+' brand blocks reconcile to the sen.</strong> '+
+          'Each block was recomputed from its own rows and matches the figure on the sheet exactly'+
+          (rc.blocks>rc.blocks_checked?' ('+(rc.blocks-rc.blocks_checked)+' block(s) state no figure to check against)':'')+'.</div>';
+      }
+      if(WB_NO_SALES && WB_NO_SALES.length){
+        html+='<div class="msg warn"><strong>'+WB_NO_SALES.length+' pharmacy tab'+
+          (WB_NO_SALES.length===1?"":"s")+' had no sales at all this month.</strong> '+
+          'Nothing in the file tells these apart from a tab nobody filled in, so check them '+
+          'before issuing: '+WB_NO_SALES.map(esc).join(", ")+'.</div>';
+      }
+      if(t.excluded_count){
+        html+='<div class="msg warn"><strong>'+t.excluded_count+' row(s) worth '+rm(t.excluded_sen)+
+          ' left off the billing</strong> — samples, testers, FOC and replacements. They still left the '+
+          'warehouse, so they count for stock, but billing a pharmacy for a gift is a real bill for '+
+          'goods it was given.</div>';
+      }
+      if(res.needs_a_decision && res.needs_a_decision.length){
+        html+='<div class="msg warn"><strong>'+res.needs_a_decision.length+
+          ' free-goods note'+(res.needs_a_decision.length===1?"":"s")+' need a decision.</strong> '+
+          'These rows carry a price AND a note like "FOC 4 PCS MCS SILK MASK" — that usually describes '+
+          'a gift given <em>with</em> a paid sale, in which case the sale should still be billed. '+
+          'They are excluded for now. Your answer is remembered for every future month.'+
+          '<div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>Pharmacy</th><th>Brand</th>'+
+          '<th>Note on the row</th><th class="num">Value</th><th></th></tr></thead><tbody>'+
+          res.needs_a_decision.map(function(d){
+            return "<tr><td class='name'>"+esc(d.pharmacy)+"</td><td>"+esc(d.brand||"—")+"</td>"+
+              "<td>"+esc(d.marker)+"</td><td class='num'>"+rm(d.gross_sen)+"</td>"+
+              "<td><button class='link mkBill' data-m='"+esc(d.marker)+"'>Bill it</button> · "+
+              "<button class='link mkExcl' data-m='"+esc(d.marker)+"'>Keep it free</button></td></tr>";
+          }).join("")+"</tbody></table></div></div>";
+      }
+    }
 
     if(t.unlinked){
       html+='<div class="msg warn"><strong>'+t.unlinked+' pharmac'+(t.unlinked===1?"y":"ies")+
@@ -1019,7 +1167,9 @@
       "</div>";
 
     html+='<div class="tbl-wrap"><table><thead><tr><th>Pharmacy</th><th>Xero contact</th>'+
-      '<th class="num">Lines</th><th class="num">Amount</th><th>Status</th></tr></thead><tbody>'+
+      (isWb?'<th>Brands</th>':'')+
+      '<th class="num">Lines</th>'+(isWb?'<th class="num">Gross</th><th class="num">Discount</th>':'')+
+      '<th class="num">Invoice</th><th>Status</th></tr></thead><tbody>'+
       res.groups.map(function(g){
         var contact = g.xero_contact_name
           ? esc(g.xero_contact_name)+(g.match_method==="fuzzy_auto"?' <span class="pill mute">auto '+(g.match_score||"")+"</span>":"")
@@ -1030,13 +1180,31 @@
           ? '<span class="pill bad" title="'+esc(g.issued.error||"")+'">failed</span>'
           : g.xero_contact_id ? '<span class="pill warn">ready</span>' : '<span class="pill mute">blocked</span>';
         return "<tr><td class='name'>"+esc(g.pharmacy_name)+"</td><td>"+contact+"</td>"+
-          "<td class='num'>"+g.lines.length+"</td><td class='num'>"+rm(g.total_sen)+"</td>"+
-          "<td>"+st+"</td></tr>";
+          (isWb?"<td style='font-size:12px'>"+esc((g.brands||[]).join(", "))+"</td>":"")+
+          "<td class='num'>"+g.lines.length+"</td>"+
+          (isWb?"<td class='num'>"+rm(g.gross_sen||0)+"</td><td class='num'>−"+rm(g.discount_sen||0)+"</td>":"")+
+          "<td class='num'>"+rm(g.total_sen)+"</td><td>"+st+"</td></tr>";
       }).join("")+
-      "</tbody><tfoot><tr><td colspan='2'>Total</td><td class='num'>"+t.lines+"</td>"+
+      "</tbody><tfoot><tr><td colspan='"+(isWb?3:2)+"'>Total</td><td class='num'>"+t.lines+"</td>"+
+      (isWb?"<td class='num'>"+rm(t.gross_sen||0)+"</td><td class='num'>−"+rm(t.discount_sen||0)+"</td>":"")+
       "<td class='num'>"+rm(t.total_sen)+"</td><td></td></tr></tfoot></table></div>";
 
     box.innerHTML=html;
+
+    // Free-goods rulings. Recorded against the note text, not the row, because the row moves
+    // when the workbook is edited and the note does not.
+    function decide(marker, decision){
+      return async function(){
+        var r=await API.call("o2o_marker_decide",{ company_id:ACTIVE.id, batch_id:batchId,
+                                                   marker:marker, decision:decision });
+        if(!r.ok) return alert(AUTH.friendlyError(r.error));
+        toast(decision==="bill" ? "Billed from now on — "+r.applied_to_batch+" row(s) updated"
+                                : "Kept free from now on");
+        render();
+      };
+    }
+    box.querySelectorAll("button.mkBill").forEach(function(x){ x.onclick=decide(x.dataset.m,"bill"); });
+    box.querySelectorAll("button.mkExcl").forEach(function(x){ x.onclick=decide(x.dataset.m,"exclude"); });
 
     var rb=$("resolveBtn");
     if(rb) rb.onclick=async function(){
@@ -1118,10 +1286,21 @@
           '<div class="tbl-wrap" style="box-shadow:none;margin-top:8px"><table><thead><tr>'+
           '<th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Line</th></tr></thead><tbody>'+
           p.payload.LineItems.map(function(li){
-            return "<tr><td>"+esc(li.Description)+"</td><td class='num'>"+li.Quantity+"</td>"+
-              "<td class='num'>"+li.UnitAmount.toFixed(2)+"</td>"+
-              "<td class='num'>"+(li.Quantity*li.UnitAmount).toFixed(2)+"</td></tr>";
-          }).join("")+"</tbody></table></div></div>";
+            // A line with no UnitAmount is a brand heading, not a charge — Xero renders it as
+            // a section title with no amount, and so does this.
+            if(li.UnitAmount===undefined||li.UnitAmount===null){
+              return "<tr><td colspan='4' style='font-weight:600;padding-top:10px'>"+
+                     esc(li.Description)+"</td></tr>";
+            }
+            var line=(li.Quantity||1)*li.UnitAmount;
+            var neg=line<0?" style='color:var(--bad)'":"";
+            return "<tr><td"+neg+">"+esc(li.Description)+"</td><td class='num'>"+(li.Quantity||1)+"</td>"+
+              "<td class='num'"+neg+">"+li.UnitAmount.toFixed(2)+"</td>"+
+              "<td class='num'"+neg+">"+line.toFixed(2)+"</td></tr>";
+          }).join("")+
+          "</tbody><tfoot><tr><td colspan='3'>Invoice total</td><td class='num'>"+
+          (p.total_sen/100).toLocaleString("en-MY",{minimumFractionDigits:2,maximumFractionDigits:2})+
+          "</td></tr></tfoot></table></div></div>";
       }).join("")+
       (r.would_issue>r.preview.length?'<p class="sub">…and '+(r.would_issue-r.preview.length)+" more.</p>":"")+
       '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="pClose">Close</button></div></div>';
