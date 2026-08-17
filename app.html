@@ -336,6 +336,8 @@
   // ═══════════ shell ═══════════
   const TABS = [
     { key:"overview", label:"Overview" },
+    { key:"pnl",      label:"Profit & Loss", feature:"pnl" },
+    { key:"brands",   label:"Brands", feature:"brands" },
     { key:"payroll",  label:"Payroll",   feature:"payroll" },
     { key:"people",   label:"Employees", feature:"payroll" },
     { key:"o2o",      label:"O2O Invoicing", feature:"o2o" },
@@ -390,6 +392,8 @@
     const v=$("view");
     if (!visibleTabs().some((t)=>t.key===TAB)) TAB = "overview";
     if (TAB==="overview") return renderOverview(v);
+    if (TAB==="pnl")      return renderPnl(v);
+    if (TAB==="brands")   return renderBrands(v);
     if (TAB==="payroll")  return renderPayroll(v);
     if (TAB==="people")   return renderPeople(v);
     if (TAB==="o2o")      return renderO2O(v);
@@ -1610,6 +1614,283 @@
       toast(res.decision==="ready_to_post"?"Added — ready to post":"Added — needs review");
       AP_DOC=res.document_id; AP_FILTER=""; render();
     };
+  }
+
+
+  // ═══════════ profit & loss ═══════════
+  var PNL_MONTHS = 12, PNL_DATA = null;
+
+  // Charts are hand-drawn SVG: no library, no request, and they inherit the theme because
+  // they use the same CSS variables as everything else.
+  function svgBars(series, opts){
+    opts = opts || {};
+    var w = 820, h = 240, padL = 8, padR = 8, padT = 18, padB = 26;
+    var n = series.length; if(!n) return '<p class="empty">Nothing to chart.</p>';
+    var maxV = Math.max.apply(null, series.map(function(s){ return Math.max(Math.abs(s.a||0), Math.abs(s.b||0)); }));
+    if(!maxV) maxV = 1;
+    var innerW = w - padL - padR, innerH = h - padT - padB;
+    var slot = innerW / n, bw = Math.min(20, slot*0.32);
+    var y = function(v){ return padT + innerH - (Math.abs(v)/maxV)*innerH; };
+    var parts = [];
+    for(var g=1; g<=3; g++){
+      var gy = padT + innerH*(g/4);
+      parts.push('<line x1="'+padL+'" y1="'+gy+'" x2="'+(w-padR)+'" y2="'+gy+'" stroke="var(--rule)" opacity=".55"/>');
+    }
+    series.forEach(function(s,i){
+      var cx = padL + slot*i + slot/2;
+      var ay = y(s.a||0), by = y(s.b||0);
+      parts.push('<rect x="'+(cx-bw-1)+'" y="'+ay+'" width="'+bw+'" height="'+(padT+innerH-ay)+'" rx="2" fill="var(--ctg-blue-lt)"><title>'+
+        esc(s.label)+' · '+opts.aLabel+' '+rm(s.a||0)+'</title></rect>');
+      parts.push('<rect x="'+(cx+1)+'" y="'+by+'" width="'+bw+'" height="'+(padT+innerH-by)+'" rx="2" fill="var(--ctg-verm-lt)"><title>'+
+        esc(s.label)+' · '+opts.bLabel+' '+rm(s.b||0)+'</title></rect>');
+      if(n<=14 || i%2===0){
+        parts.push('<text x="'+cx+'" y="'+(h-8)+'" font-size="10" text-anchor="middle" fill="var(--ink-faint)">'+esc(s.short)+'</text>');
+      }
+    });
+    // Net line over the bars, so profitability reads at a glance against the two totals.
+    if(opts.net){
+      var pts = series.map(function(s,i){
+        var cx = padL + slot*i + slot/2;
+        var v = (s.a||0)-(s.b||0);
+        var ny = padT + innerH - (v/maxV)*innerH*0.5 - innerH*0.0;
+        return cx+','+Math.max(padT, Math.min(padT+innerH, ny));
+      }).join(' ');
+      parts.push('<polyline points="'+pts+'" fill="none" stroke="var(--ctg-amber-lt)" stroke-width="2"/>');
+    }
+    return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" role="img">'+parts.join("")+'</svg>';
+  }
+
+  function svgStack(months, seriesMap, palette){
+    var keys = Object.keys(seriesMap);
+    if(!keys.length) return '<p class="empty">Nothing to chart.</p>';
+    var w=820,h=210,padL=8,padR=8,padT=14,padB=26;
+    var innerW=w-padL-padR, innerH=h-padT-padB;
+    var slot=innerW/months.length, bw=Math.min(30, slot*0.6);
+    var totals = months.map(function(m){
+      return keys.reduce(function(s,k){ return s + Math.abs(seriesMap[k][m]||0); },0); });
+    var maxV = Math.max.apply(null, totals) || 1;
+    var parts=[];
+    months.forEach(function(m,i){
+      var cx = padL + slot*i + slot/2 - bw/2;
+      var acc = 0;
+      keys.forEach(function(k,ki){
+        var v = Math.abs(seriesMap[k][m]||0); if(!v) return;
+        var segH = (v/maxV)*innerH;
+        var yTop = padT + innerH - acc - segH;
+        parts.push('<rect x="'+cx+'" y="'+yTop+'" width="'+bw+'" height="'+segH+'" fill="'+palette[ki%palette.length]+'"><title>'+
+          esc(k)+' · '+esc(m)+' · '+rm(seriesMap[k][m]||0)+'</title></rect>');
+        acc += segH;
+      });
+      if(months.length<=14 || i%2===0){
+        parts.push('<text x="'+(cx+bw/2)+'" y="'+(h-8)+'" font-size="10" text-anchor="middle" fill="var(--ink-faint)">'+
+          esc(m.slice(5)+"/"+m.slice(2,4))+'</text>');
+      }
+    });
+    var legend = keys.map(function(k,ki){
+      return '<span style="display:inline-flex;align-items:center;gap:5px;margin-right:12px;font-size:12px;color:var(--ink-soft)">'+
+        '<span style="width:9px;height:9px;border-radius:2px;background:'+palette[ki%palette.length]+'"></span>'+esc(k)+"</span>"; }).join("");
+    return '<svg viewBox="0 0 '+w+' '+h+'" width="100%" height="'+h+'" role="img">'+parts.join("")+'</svg>'+
+           '<div style="margin-top:8px">'+legend+"</div>";
+  }
+
+  var BLOCK_COLOURS = ["var(--ctg-blue-lt)","var(--ctg-amber-lt)","var(--ctg-verm-lt)","#7A9E3B","#8B6BB1","#8892a6"];
+
+  async function renderPnl(v){
+    v.innerHTML=
+      '<div class="row" style="margin-bottom:16px"><div class="grow">'+
+      '<h2>Profit &amp; loss</h2><p class="sub" style="margin:0" id="pnlAsAt">Loading…</p></div>'+
+      '<select id="pnlScope" style="width:auto"><option value="">All companies</option>'+
+        COMPANIES.map(function(c){ return '<option value="'+esc(c.id)+'">'+esc(c.short_name)+"</option>"; }).join("")+
+      "</select>"+
+      '<select id="pnlMonths" style="width:auto">'+
+        [6,12,18,24].map(function(m){ return '<option value="'+m+'"'+(m===PNL_MONTHS?" selected":"")+">"+m+" months</option>"; }).join("")+
+      "</select>"+
+      (canWrite()?'<button class="btn btn-sm" id="pnlRefresh">Refresh from Xero</button>':"")+
+      "</div><div id=\"pnlBody\"><p class=\"empty\">Loading…</p></div>";
+    $("pnlScope").onchange=function(){ loadPnl(); };
+    $("pnlMonths").onchange=function(e){ PNL_MONTHS=parseInt(e.target.value,10); loadPnl(); };
+    var rb=$("pnlRefresh");
+    if(rb) rb.onclick=async function(){
+      rb.disabled=true; rb.textContent="Reading Xero… this takes a moment";
+      var r=await API.call("pnl_refresh",{ months:PNL_MONTHS, company_id:$("pnlScope").value||undefined });
+      rb.disabled=false; rb.textContent="Refresh from Xero";
+      if(!r.ok) return alert(r.error);
+      if(r.failed && r.failed.length){
+        alert("Could not load some companies:\n\n"+r.failed.map(function(f){ return f.company+" — "+f.error; }).join("\n\n"));
+      } else {
+        toast("Loaded "+r.refreshed.reduce(function(s,x){return s+x.months_refreshed;},0)+" company-months");
+      }
+      loadPnl();
+    };
+    loadPnl();
+  }
+
+  async function loadPnl(){
+    var box=$("pnlBody"); if(!box) return;
+    box.innerHTML='<p class="empty">Loading…</p>';
+    var res=await API.call("pnl_report",{ months:PNL_MONTHS, company_id:$("pnlScope").value||undefined });
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+
+    var asAt=$("pnlAsAt");
+    if(res.empty){
+      if(asAt) asAt.textContent="No data loaded yet";
+      box.innerHTML='<div class="panel"><p class="empty">'+esc(res.reason)+"</p>"+
+        (canWrite()?'<p class="sub" style="margin-top:8px">Use <strong>Refresh from Xero</strong> above. '+
+         'If it reports a permission problem, the Xero connection needs re-authorising — the '+
+         'report permission was added after the current connection was made.</p>':"")+"</div>";
+      return;
+    }
+    if(asAt) asAt.textContent = res.refreshed_at ? ("Last loaded from Xero "+fmtDateTime(res.refreshed_at)) : "";
+
+    var g=res.grand, months=res.months;
+    var html="";
+
+    if(res.companies_missing && res.companies_missing.length){
+      html+='<div class="msg warn">No profit &amp; loss loaded for: '+res.companies_missing.map(esc).join(", ")+
+        ". Those companies contribute nothing to the figures below.</div>";
+    }
+
+    html+='<div class="tiles">'+
+      tile("Revenue", rm0(g.revenue_sen), months.length+" months", true)+
+      tile("Gross profit", rm0(g.gross_profit_sen), (g.gp_margin_pct!=null?g.gp_margin_pct+"% margin":""))+
+      tile("Operating expenses", rm0(g.expenses_sen), (g.expense_ratio_pct!=null?g.expense_ratio_pct+"% of revenue":""))+
+      tile("Net profit", rm0(g.net_profit_sen), (g.net_margin_pct!=null?g.net_margin_pct+"% net margin":""), true)+
+      "</div>";
+
+    // Revenue vs expenses by month
+    var series = months.map(function(m){
+      var b=res.by_month[m]||{};
+      return { label:m, short:m.slice(5)+"/"+m.slice(2,4),
+               a:b.revenue_sen||0, b:(b.expenses_sen||0)+(b.cos_sen||0) };
+    });
+    html+='<div class="panel"><h2 style="font-size:16px">Revenue and cost by month</h2>'+
+      '<p class="sub">Blue is revenue, vermilion is total cost, amber traces the net.</p>'+
+      svgBars(series,{aLabel:"revenue",bLabel:"cost",net:true})+"</div>";
+
+    // Monthly table with margins and MoM
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Month</th><th class="num">Revenue</th>'+
+      '<th class="num">Cost of sales</th><th class="num">Gross profit</th><th class="num">Expenses</th>'+
+      '<th class="num">Net profit</th><th class="num">Margin</th><th class="num">Rev MoM</th></tr></thead><tbody>'+
+      months.map(function(m,i){
+        var b=res.by_month[m]||{};
+        var gp=(b.revenue_sen||0)-(b.cos_sen||0);
+        var margin=b.revenue_sen? ((b.net_profit_sen/b.revenue_sen)*100):null;
+        var prev=i>0?(res.by_month[months[i-1]]||{}).revenue_sen:null;
+        var mom=(prev&&b.revenue_sen!=null)?((b.revenue_sen-prev)/Math.abs(prev)*100):null;
+        return "<tr><td class='name'>"+esc(m)+"</td>"+
+          "<td class='num'>"+rm(b.revenue_sen)+"</td><td class='num'>"+rm(b.cos_sen)+"</td>"+
+          "<td class='num'>"+rm(gp)+"</td><td class='num'>"+rm(b.expenses_sen)+"</td>"+
+          "<td class='num'"+((b.net_profit_sen||0)<0?" style='color:var(--bad);font-weight:700'":"")+">"+rm(b.net_profit_sen)+"</td>"+
+          "<td class='num'>"+(margin!=null?margin.toFixed(1)+"%":"—")+"</td>"+
+          "<td class='num'>"+(mom!=null?'<span style="color:'+(mom>=0?"var(--good)":"var(--bad)")+'">'+(mom>=0?"▲":"▼")+Math.abs(mom).toFixed(0)+"%</span>":"—")+"</td></tr>";
+      }).join("")+
+      "<tr style='font-weight:700;background:var(--sunken)'><td>Total</td>"+
+      "<td class='num'>"+rm(g.revenue_sen)+"</td><td class='num'>"+rm(g.cos_sen)+"</td>"+
+      "<td class='num'>"+rm(g.gross_profit_sen)+"</td><td class='num'>"+rm(g.expenses_sen)+"</td>"+
+      "<td class='num'>"+rm(g.net_profit_sen)+"</td>"+
+      "<td class='num'>"+(g.net_margin_pct!=null?g.net_margin_pct+"%":"—")+"</td><td></td></tr>"+
+      "</tbody></table></div>";
+
+    // Revenue streams — the channel dimension
+    var streamKeys=Object.keys(res.streams||{});
+    if(streamKeys.length){
+      html+='<div class="panel" style="margin-top:18px"><h2 style="font-size:16px">Revenue by stream</h2>'+
+        '<p class="sub">Which channel the revenue came through, taken from the account it was booked to.</p>'+
+        svgStack(months,res.streams,BLOCK_COLOURS)+"</div>";
+    }
+
+    // Cost blocks
+    var blockKeys=Object.keys(res.blocks||{});
+    if(blockKeys.length){
+      html+='<div class="panel"><h2 style="font-size:16px">Operating expenses by cost block</h2>'+
+        '<p class="sub">Staff, fulfilment, marketing, general, finance — so a rise in cost can be attributed.</p>'+
+        svgStack(months,res.blocks,BLOCK_COLOURS)+"</div>";
+    }
+
+    // Company scorecard
+    html+='<h2 style="font-size:16px;margin:24px 0 4px">By company</h2>'+
+      '<p class="sub">Every figure above, traced to the entity it came from.</p>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>Company</th><th class="num">Revenue</th>'+
+      '<th class="num">Cost</th><th class="num">Net profit</th><th class="num">Margin</th></tr></thead><tbody>'+
+      res.companies.map(function(c){
+        return "<tr><td class='name'>"+esc(c.short_name)+
+          (!c.connected?' <span class="pill warn">no Xero</span>':(!c.has_data?' <span class="pill mute">not loaded</span>':""))+"</td>"+
+          "<td class='num'>"+rm(c.revenue_sen)+"</td><td class='num'>"+rm(c.expenses_sen)+"</td>"+
+          "<td class='num'"+((c.net_profit_sen||0)<0?" style='color:var(--bad);font-weight:700'":"")+">"+rm(c.net_profit_sen)+"</td>"+
+          "<td class='num'>"+(c.margin_pct!=null?c.margin_pct+"%":"—")+"</td></tr>";
+      }).join("")+"</tbody></table></div>";
+
+    // The account grid
+    html+='<h2 style="font-size:16px;margin:24px 0 4px">Account detail</h2>'+
+      '<p class="sub">Every account, month by month, newest last.</p>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>Account</th><th>Group</th>'+
+      months.map(function(m){ return '<th class="num">'+esc(m.slice(5)+"/"+m.slice(2,4))+"</th>"; }).join("")+
+      '<th class="num">Total</th></tr></thead><tbody>'+
+      res.lines.map(function(l){
+        return "<tr><td class='name'>"+esc(l.account)+"</td>"+
+          "<td>"+(l.kind==="income"
+            ? '<span class="pill good">'+esc(l.stream||"revenue")+"</span>"
+            : '<span class="pill mute">'+esc(l.block||"OTHER")+"</span>")+"</td>"+
+          months.map(function(m){
+            var v=l.by_month[m];
+            return "<td class='num'>"+(v==null?"—":rm(v))+"</td>";
+          }).join("")+
+          "<td class='num'><strong>"+rm(l.total_sen)+"</strong></td></tr>";
+      }).join("")+"</tbody></table></div>";
+
+    box.innerHTML=html;
+  }
+
+  // ═══════════ brands ═══════════
+  var BRAND_MONTHS = 12;
+
+  async function renderBrands(v){
+    v.innerHTML=
+      '<div class="row" style="margin-bottom:16px"><div class="grow">'+
+      '<h2>Brand performance</h2><p class="sub" style="margin:0">'+
+      'Revenue by brand and by channel — the cut the JV portal cannot make.</p></div>'+
+      '<select id="brMonths" style="width:auto">'+
+        [6,12,24].map(function(m){ return '<option value="'+m+'"'+(m===BRAND_MONTHS?" selected":"")+">"+m+" months</option>"; }).join("")+
+      "</select></div><div id=\"brBody\"><p class=\"empty\">Loading…</p></div>";
+    $("brMonths").onchange=function(e){ BRAND_MONTHS=parseInt(e.target.value,10); loadBrands(); };
+    loadBrands();
+  }
+
+  async function loadBrands(){
+    var box=$("brBody"); if(!box) return;
+    var res=await API.call("brand_report",{ months:BRAND_MONTHS, company_id: ACTIVE?ACTIVE.id:undefined });
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+
+    if(res.awaiting_data){
+      box.innerHTML='<div class="panel"><p class="empty">'+esc(res.note)+"</p>"+
+        '<p class="sub" style="margin-top:10px">The five brands are registered and ready — '+
+        (res.brands||[]).map(function(b){ return esc(b.name); }).join(" · ")+
+        ". Figures appear here as soon as brand-tagged sales are imported through O2O invoicing.</p></div>";
+      return;
+    }
+
+    var months=res.months;
+    var html='<div class="tiles">'+
+      tile("Total brand revenue", rm0(res.total_sen), months.length+" months", true)+
+      tile("Brands trading", String(res.brands.filter(function(b){return b.total_sen>0;}).length), "of "+res.brands.length+" registered")+
+      "</div>";
+
+    var stack={};
+    res.brands.forEach(function(b){ if(b.total_sen) stack[b.name]=b.by_month; });
+    html+='<div class="panel"><h2 style="font-size:16px">Revenue by brand</h2>'+
+      svgStack(months,stack,BLOCK_COLOURS)+"</div>";
+
+    html+='<div class="tbl-wrap"><table><thead><tr><th>Brand</th>'+
+      months.map(function(m){ return '<th class="num">'+esc(m.slice(5)+"/"+m.slice(2,4))+"</th>"; }).join("")+
+      '<th class="num">Total</th><th class="num">Share</th></tr></thead><tbody>'+
+      res.brands.map(function(b){
+        return "<tr><td class='name'>"+esc(b.name)+"</td>"+
+          months.map(function(m){ var v=b.by_month[m]; return "<td class='num'>"+(v?rm(v):"—")+"</td>"; }).join("")+
+          "<td class='num'><strong>"+rm(b.total_sen)+"</strong></td>"+
+          "<td class='num'>"+b.share_pct+"%</td></tr>";
+      }).join("")+"</tbody></table></div>";
+
+    box.innerHTML=html;
   }
 
   // ═══════════ settings ═══════════
