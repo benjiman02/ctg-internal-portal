@@ -851,21 +851,235 @@
   const today = new Date();
   let PR_YEAR = today.getFullYear(), PR_MONTH = today.getMonth()+1;
 
+  var PR_VIEW = "actual";   // "actual" = the month as paid; "computed" = a fresh calculation
+
   async function renderPayroll(v){
     if (!ACTIVE) { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
     const years=[]; for(let y=today.getFullYear()+1;y>=today.getFullYear()-2;y--) years.push(y);
     v.innerHTML =
       '<div class="row" style="margin-bottom:16px"><div class="grow">'+
       '<h2>Payroll</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+'</p></div>'+
+      '<select id="prView" style="width:auto">'+
+        '<option value="actual"'+(PR_VIEW==="actual"?" selected":"")+'>As paid (imported)</option>'+
+        '<option value="computed"'+(PR_VIEW==="computed"?" selected":"")+'>Calculated by the system</option>'+
+      '</select>'+
       '<select id="prMonth" style="width:auto">'+MONTHS.map((m,i)=>'<option value="'+(i+1)+'"'+(i+1===PR_MONTH?" selected":"")+">"+m+"</option>").join("")+"</select>"+
       '<select id="prYear" style="width:auto">'+years.map((y)=>'<option'+(y===PR_YEAR?" selected":"")+">"+y+"</option>").join("")+"</select>"+
       "</div><div id="+'"prBody"'+'><p class="empty">Loading…</p></div>';
     $("prMonth").onchange=(e)=>{ PR_MONTH=parseInt(e.target.value,10); loadPayroll(); };
     $("prYear").onchange=(e)=>{ PR_YEAR=parseInt(e.target.value,10); loadPayroll(); };
+    $("prView").onchange=(e)=>{ PR_VIEW=e.target.value; loadPayroll(); };
     loadPayroll();
   }
 
   async function loadPayroll(){
+    return PR_VIEW==="actual" ? loadPayrollActual() : loadPayrollComputed();
+  }
+
+  /** The month as it was actually paid, with every pay component shown by its own name.
+   *
+   *  A column per component, because "additions: RM1,810.71" is as opaque as no figure at all --
+   *  you cannot check an OKR payout or spot a design commission keyed twice against a lump. The
+   *  columns are built from what the data contains, not from a fixed list, since each company's
+   *  components differ and change month to month. */
+  async function loadPayrollActual(){
+    const box=$("prBody"); if(!box) return;
+    box.innerHTML='<p class="empty">Loading…</p>';
+    const res = await API.call("hr_payroll_actuals", { company_id:ACTIVE.id, year:PR_YEAR, month:PR_MONTH });
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if(!res.rows.length){
+      box.innerHTML='<div class="panel"><p class="empty">No payroll recorded for '+MONTHS[PR_MONTH-1]+" "+PR_YEAR+
+        '. Import the month\u2019s salary workbook, or switch to \u201cCalculated by the system\u201d.</p>'+
+        '<div class="row" style="margin-top:12px"><button class="btn btn-sm" id="impSal">Import salary workbook</button></div></div>';
+      var b0=$("impSal"); if(b0) b0.onclick=salaryImportModal; return;
+    }
+    var t=res.totals, L=res.component_labels, CT=res.component_totals;
+
+    var html='<div class="tiles">'+
+      tile("Headcount", String(t.headcount), "paid this month")+
+      tile("Basic pay", rm0(t.basic_sen), "before any component")+
+      tile("Components", rm0(t.components_total_sen), L.length+" kind"+(L.length===1?"":"s"))+
+      tile("Gross pay", rm0(t.gross_sen), "basic + components")+
+      tile("Net pay", rm0(t.net_sen), "to bank accounts")+
+      tile("Out of bank", rm0(t.bank_total_sen), "net + all statutory", true)+
+      "</div>";
+
+    // Each component named and totalled, so what made up the month is legible at a glance.
+    if(L.length){
+      html+='<div class="panel"><h3 style="margin:0 0 10px">What made up gross pay</h3>'+
+        '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Component</th>'+
+        '<th class="num">Total</th><th class="num">People</th></tr></thead><tbody>'+
+        '<tr><td class="name">Basic salary</td><td class="num">'+rm(t.basic_sen)+'</td>'+
+        '<td class="num">'+t.headcount+'</td></tr>'+
+        L.map(function(lab,i){
+          var n=res.rows.filter(function(r){return r.components[i]!==0;}).length;
+          return '<tr><td class="name">'+esc(lab)+'</td><td class="num">'+rm(CT[i])+'</td>'+
+                 '<td class="num">'+n+'</td></tr>';
+        }).join("")+
+        '</tbody><tfoot><tr><td>Gross pay</td><td class="num">'+rm(t.gross_sen)+'</td><td></td></tr></tfoot>'+
+        "</table></div></div>";
+    }
+
+    // Statutory, laid out the way it is actually remitted.
+    html+='<div class="panel"><h3 style="margin:0 0 10px">Statutory</h3>'+
+      '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Body</th>'+
+      '<th class="num">Employee</th><th class="num">Employer</th><th class="num">Total</th>'+
+      '</tr></thead><tbody>'+
+      [["EPF (KWSP)", "epf"],["SOCSO + SKBBK (PERKESO)","socso"],["EIS (PERKESO)","eis"]]
+        .map(function(p){
+          var ee=res.rows.reduce(function(a,r){return a+r[p[1]+"_ee_sen"]+(p[1]==="socso"?r.skbbk_ee_sen:0);},0);
+          var er=res.rows.reduce(function(a,r){return a+r[p[1]+"_er_sen"];},0);
+          return "<tr><td class='name'>"+p[0]+"</td><td class='num'>"+rm(ee)+"</td><td class='num'>"+
+                 rm(er)+"</td><td class='num'>"+rm(ee+er)+"</td></tr>";
+        }).join("")+
+      "<tr><td class='name'>PCB (LHDN)</td><td class='num'>"+rm(t.pcb_sen)+"</td><td class='num'>—</td>"+
+      "<td class='num'>"+rm(t.pcb_sen)+"</td></tr>"+
+      "<tr><td class='name'>HRD Corp levy</td><td class='num'>—</td><td class='num'>"+rm(t.hrdf_sen)+
+      "</td><td class='num'>"+rm(t.hrdf_sen)+"</td></tr>"+
+      "</tbody><tfoot><tr><td>Statutory</td><td class='num'></td><td class='num'></td>"+
+      "<td class='num'>"+rm(t.epf_sen+t.socso_sen+t.eis_sen+t.pcb_sen+t.hrdf_sen)+"</td></tr></tfoot>"+
+      "</table></div>"+
+      '<p class="fld-note" style="margin-top:10px">HRD Corp is 1% of basic pay, levied on the '+
+      'company rather than on any one person, so it is not split per head. Net pay plus every '+
+      'line above is what leaves the bank: <strong>'+rm(t.bank_total_sen)+'</strong>.</p></div>';
+
+    // Per person, one column per component.
+    html+='<div class="tbl-wrap"><table><thead><tr><th>No.</th><th>Name</th>'+
+      '<th class="num">Basic</th>'+L.map(function(lab){
+        // Header shows the component's short name; the full label, brackets and all, is the
+        // tooltip. Trailing punctuation is stripped because "Incentive. ( OKR )" otherwise
+        // renders as "Incentive." with a stray full stop.
+        var short=lab.split("(")[0].replace(/[.,;:\s]+$/,"").trim();
+        return '<th class="num" title="'+esc(lab)+'">'+esc(short.slice(0,18))+'</th>';
+      }).join("")+
+      '<th class="num">Gross</th><th class="num">EPF</th><th class="num">SOCSO</th>'+
+      '<th class="num">EIS</th><th class="num">PCB</th><th class="num">Net</th>'+
+      '</tr></thead><tbody>'+
+      res.rows.map(function(r){
+        return "<tr"+(r.variances.length?' class="warn-row"':"")+">"+
+          "<td>"+esc(r.emp_no||"—")+"</td>"+
+          "<td class='name'>"+esc(r.name)+(nickWorthShowing(r.name,r.nickname)
+            ?' <span class="sub">'+esc(r.nickname)+"</span>":"")+"</td>"+
+          "<td class='num'>"+rm(r.basic_sen)+"</td>"+
+          r.components.map(function(c){ return "<td class='num'>"+(c?rm(c):'<span style="color:var(--ink-faint)">—</span>')+"</td>"; }).join("")+
+          "<td class='num'>"+rm(r.gross_sen)+"</td>"+
+          "<td class='num'>"+rm(r.epf_ee_sen)+"</td><td class='num'>"+rm(r.socso_ee_sen+r.skbbk_ee_sen)+"</td>"+
+          "<td class='num'>"+rm(r.eis_ee_sen)+"</td><td class='num'>"+rm(r.pcb_sen)+"</td>"+
+          "<td class='num'><strong>"+rm(r.net_sen)+"</strong></td></tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td></td><td>"+t.headcount+" employees</td><td class='num'>"+rm(t.basic_sen)+"</td>"+
+      CT.map(function(c){ return "<td class='num'>"+rm(c)+"</td>"; }).join("")+
+      "<td class='num'>"+rm(t.gross_sen)+"</td>"+
+      "<td class='num'>"+rm(res.rows.reduce(function(a,r){return a+r.epf_ee_sen;},0))+"</td>"+
+      "<td class='num'>"+rm(res.rows.reduce(function(a,r){return a+r.socso_ee_sen+r.skbbk_ee_sen;},0))+"</td>"+
+      "<td class='num'>"+rm(res.rows.reduce(function(a,r){return a+r.eis_ee_sen;},0))+"</td>"+
+      "<td class='num'>"+rm(t.pcb_sen)+"</td><td class='num'>"+rm(t.net_sen)+"</td></tr></tfoot></table></div>";
+
+    // Where the figures came from, and whether they still agree with the source workbook.
+    html+='<div class="row" style="margin-top:14px">'+
+      res.runs.map(function(rr){
+        var agrees = rr.workbook_total_sen===null || rr.workbook_total_sen===t.bank_total_sen;
+        return '<span class="pill '+(agrees?"good":"bad")+'">'+(agrees?'<span class="dot"></span>':"")+
+          esc(rr.source==="imported"?"imported":"calculated")+
+          (rr.source_name?" · "+esc(rr.source_name):"")+
+          (agrees?"":" · workbook says "+rm(rr.workbook_total_sen))+"</span>";
+      }).join("")+
+      '<span class="grow"></span><button class="btn btn-sm btn-ghost" id="impSal2">Re-import workbook</button></div>';
+
+    box.innerHTML=html;
+    var b2=$("impSal2"); if(b2) b2.onclick=salaryImportModal;
+  }
+
+  /** A nickname only earns space when it tells you something the name does not. "Anson Tham /
+   *  Anson" is noise; "Saw Wen Ni / Wenni" and "Cheah Evean / 依纹" are how people are actually
+   *  addressed, so those stay. */
+  function nickWorthShowing(name, nick){
+    if(!nick) return false;
+    var n=String(name).toLowerCase().replace(/[^a-z\u4e00-\u9fff]/g,"");
+    var k=String(nick).toLowerCase().replace(/[^a-z\u4e00-\u9fff]/g,"");
+    return !!k && !n.includes(k);
+  }
+
+  /** Imports a month's salary workbook. Every sheet is checked against its own total row before
+   *  anything is written, and a sheet that does not add up stops the whole import -- a payroll
+   *  figure that is nearly right is worse than none. */
+  function salaryImportModal(){
+    var now=new Date();
+    var years=[]; for(var y=now.getFullYear()+1;y>=now.getFullYear()-2;y--) years.push(y);
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:640px"><h3>Import the salary workbook</h3>'+
+      '<div id="slMsg" class="msg err hide"></div>'+
+      '<p class="sub">The monthly workbook as your team keeps it \u2014 one tab per company. Every '+
+      'pay component is read by its own name, so incentives, commissions and allowances stay '+
+      'visible rather than being folded into one figure. A tab marked \u201cRevised\u201d '+
+      'supersedes the plain one. Skindae is skipped.</p>'+
+      '<div class="fields">'+
+        '<div><label>Month</label><select id="s_month">'+MONTHS.map(function(m,i){
+          return '<option value="'+(i+1)+'"'+(i+1===PR_MONTH?" selected":"")+">"+m+"</option>"; }).join("")+"</select></div>"+
+        '<div><label>Year</label><select id="s_year">'+years.map(function(y){
+          return '<option'+(y===PR_YEAR?" selected":"")+">"+y+"</option>"; }).join("")+"</select></div>"+
+        '<div class="full"><label>Workbook (.xlsx)</label><input type="file" id="s_file" accept=".xlsx"></div>'+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="slCancel">Cancel</button>'+
+      '<button class="btn btn-sm btn-ghost" id="slDry">Check only</button>'+
+      '<button class="btn btn-sm" id="slGo">Import</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#slCancel").onclick=function(){ bg.remove(); };
+
+    async function run(dry){
+      var f=bg.querySelector("#s_file").files[0];
+      var m=bg.querySelector("#slMsg"); m.classList.add("hide");
+      if(!f){ m.textContent="Choose the workbook first."; m.classList.remove("hide"); return; }
+      var btn=bg.querySelector(dry?"#slDry":"#slGo"); var label=btn.textContent; btn.disabled=true;
+      var fail=function(msg){ btn.disabled=false; btn.textContent=label;
+        m.innerHTML=msg; m.classList.remove("hide"); };
+      try{
+        btn.textContent="Reading\u2026";
+        var X=await loadXlsx();
+        var wb=X.read(new Uint8Array(await f.arrayBuffer()),{type:"array",cellDates:false});
+        var sheets={};
+        wb.SheetNames.forEach(function(n){
+          sheets[n]=X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:null,blankrows:true});
+        });
+        btn.textContent="Checking\u2026";
+        var res=await API.call("hr_import_salary",{
+          year:parseInt(bg.querySelector("#s_year").value,10),
+          month:parseInt(bg.querySelector("#s_month").value,10),
+          source_name:f.name, sheets:sheets, dry_run:!!dry,
+        });
+        if(!res.ok) return fail(esc(AUTH.friendlyError(res.error)));
+        if(dry){
+          btn.disabled=false; btn.textContent=label;
+          m.className="msg"; m.innerHTML='<strong>Checked, nothing written.</strong>'+
+            '<div class="tbl-wrap" style="margin-top:8px;box-shadow:none"><table><thead><tr>'+
+            '<th>Sheet</th><th class="num">People</th><th>Reconciles</th><th class="num">Out of bank</th>'+
+            '</tr></thead><tbody>'+res.sheets.map(function(sh){
+              return "<tr><td class='name'>"+esc(sh.sheet)+"</td><td class='num'>"+sh.employees+"</td>"+
+                "<td>"+(sh.company_id===null?'<span class="pill mute">skipped</span>'
+                  : sh.reconciles?'<span class="pill good"><span class="dot"></span>exact</span>'
+                  :'<span class="pill bad">out by '+rm(sh.variance_sen)+"</span>")+"</td>"+
+                "<td class='num'>"+rm(sh.bank_total_sen)+"</td></tr>";
+            }).join("")+"</tbody></table></div>"+
+            (res.ignored_sheets&&res.ignored_sheets.length
+              ? '<p class="fld-note">Skipped as out of scope: '+esc(res.ignored_sheets.join(", "))+"</p>":"")+
+            (res.superseded&&res.superseded.length
+              ? '<p class="fld-note">'+res.superseded.map(function(x){
+                  return esc(x.used)+" supersedes "+esc(x.ignored); }).join("; ")+"</p>":"");
+          m.classList.remove("hide"); return;
+        }
+        bg.remove();
+        var okCount=res.results.filter(function(r){return r.run_id;}).length;
+        toast("Imported "+okCount+" compan"+(okCount===1?"y":"ies")+" \u00b7 all figures reconcile");
+        loadPayroll();
+      }catch(err){ fail(esc(String(err&&err.message||err))); }
+    }
+    bg.querySelector("#slDry").onclick=function(){ run(true); };
+    bg.querySelector("#slGo").onclick=function(){ run(false); };
+  }
+
+  /** A fresh calculation from the employee records, for a month not yet paid. */
+  async function loadPayrollComputed(){
     const box=$("prBody"); if(!box) return;
     box.innerHTML='<p class="empty">Loading…</p>';
     const res = await API.call("hr_payroll_run_get", { company_id:ACTIVE.id, year:PR_YEAR, month:PR_MONTH });
