@@ -312,15 +312,27 @@
     const panel = $("xeroPanel");
     if (!res.ok) { panel.innerHTML = '<p class="empty">' + esc(AUTH.friendlyError(res.error)) + "</p>"; return; }
 
-    if (!res.connected) {
-      panel.innerHTML =
-        '<p class="sub" style="margin:0 0 14px">No Xero organisation is connected yet.</p>' +
-        '<button class="btn btn-sm" id="connectBtn">Connect Xero</button>';
-      $("connectBtn").addEventListener("click", async () => {
+    // Xero grants one organisation per authorisation, so the connect action stays available
+    // after the first success -- otherwise there is no way to add the remaining companies.
+    // Each run adds to the same grant; nothing already connected is disturbed.
+    const connectBtn = (label) =>
+      '<button class="btn btn-sm" id="connectBtn">' + label + "</button>";
+
+    const wireConnect = () => {
+      const btn = $("connectBtn");
+      if (!btn) return;
+      btn.addEventListener("click", async () => {
         const r = await API.call("xero_connect_url");
         if (!r.ok) return alert("Can't start the Xero connection: " + r.error);
         window.open(r.url, "_blank", "noopener");
       });
+    };
+
+    if (!res.connected) {
+      panel.innerHTML =
+        '<p class="sub" style="margin:0 0 14px">No Xero organisation is connected yet.</p>' +
+        connectBtn("Connect Xero");
+      wireConnect();
       return;
     }
 
@@ -334,6 +346,7 @@
       (res.connected_at ? " on " + esc(fmtDate(res.connected_at)) : "") + ". " +
       (res.orgs || []).length + " organisation" + ((res.orgs || []).length === 1 ? "" : "s") + " visible.</p>";
 
+    const awaiting = (res.companies || []).filter((c) => !c.xero_tenant_id);
     if (!unlinked.length) {
       html += '<p class="empty">Every visible organisation is linked to a company.</p>';
     } else {
@@ -350,7 +363,21 @@
         "</div>";
       }).join("");
     }
+    // Name the companies still waiting, so it's obvious how many more passes are needed
+    // rather than leaving the reader to diff two lists by eye.
+    html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--rule-soft)">';
+    if (awaiting.length) {
+      html += '<p class="sub" style="margin:0 0 10px">Still without a Xero organisation: ' +
+        awaiting.map((c) => esc(c.short_name)).join(", ") +
+        ". Xero grants one organisation per authorisation, so run this once more for each.</p>";
+    } else {
+      html += '<p class="sub" style="margin:0 0 10px">Every company has a Xero organisation linked.</p>';
+    }
+    html += connectBtn(awaiting.length ? "Connect another organisation" : "Connect another organisation (optional)");
+    html += "</div>";
+
     panel.innerHTML = html;
+    wireConnect();
 
     panel.querySelectorAll(".link-btn").forEach((btn) => {
       btn.addEventListener("click", async () => {
