@@ -7,7 +7,7 @@
 <meta name="robots" content="noindex">
 <style>
   :root{
-    --paper:#F3F5F6; --raised:#FFFFFF;
+    --paper:#F3F5F6; --raised:#FFFFFF; --sunken:#EDF1F2;
     --ink:#14202B; --ink-soft:#4B5C68; --ink-faint:#7C8A93;
     --rule:#D6DEE1; --rule-soft:#E6ECEE;
     --accent:#1B6B63; --accent-strong:#134F49; --accent-soft:#E4F0EE;
@@ -19,7 +19,7 @@
   }
   @media (prefers-color-scheme:dark){
     :root:not([data-theme="light"]){
-      --paper:#12181E; --raised:#182028;
+      --paper:#12181E; --raised:#182028; --sunken:#0E141A;
       --ink:#EDF1F2; --ink-soft:#A7B7C0; --ink-faint:#7E8E97;
       --rule:#2B3742; --rule-soft:#212B33;
       --accent:#59BBAC; --accent-strong:#7FD2C4; --accent-soft:#173B37;
@@ -31,7 +31,7 @@
     }
   }
   :root[data-theme="dark"]{
-    --paper:#12181E; --raised:#182028;
+    --paper:#12181E; --raised:#182028; --sunken:#0E141A;
     --ink:#EDF1F2; --ink-soft:#A7B7C0; --ink-faint:#7E8E97;
     --rule:#2B3742; --rule-soft:#212B33;
     --accent:#59BBAC; --accent-strong:#7FD2C4; --accent-soft:#173B37;
@@ -43,76 +43,121 @@
   }
 
   *{box-sizing:border-box}
-  body{
-    margin:0; background:var(--paper); color:var(--ink);
-    font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-  .mono{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
+  body{margin:0;background:var(--paper);color:var(--ink);
+       font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-font-smoothing:antialiased}
+  .mono,.num{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;font-variant-numeric:tabular-nums}
   .hide{display:none !important}
   button{font:inherit;cursor:pointer}
   button:focus-visible,input:focus-visible,select:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  h2{font-size:20px;margin:0 0 4px}
+  .sub{color:var(--ink-soft);font-size:14px;margin:0 0 18px}
 
-  /* ---------- sign in ---------- */
+  /* ── sign in ── */
   #signin{min-height:100vh;display:grid;place-items:center;padding:24px}
   .card{background:var(--raised);border:1px solid var(--rule);border-radius:14px;padding:32px;
         width:100%;max-width:400px;box-shadow:var(--shadow)}
   .brand{font-size:12px;letter-spacing:.09em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:8px}
   .card h1{font-size:21px;margin:0 0 22px;line-height:1.25}
   label{display:block;font-size:13px;font-weight:600;color:var(--ink-soft);margin:0 0 6px}
-  input{width:100%;padding:10px 12px;border:1px solid var(--rule);border-radius:8px;
-        background:var(--paper);color:var(--ink);font:inherit;margin-bottom:16px}
-  .btn{width:100%;padding:11px 16px;border:none;border-radius:8px;background:var(--accent);
-       color:#fff;font-weight:600;transition:opacity .15s}
+  input,select,textarea{width:100%;padding:9px 11px;border:1px solid var(--rule);border-radius:8px;
+        background:var(--paper);color:var(--ink);font:inherit}
+  #signin input{margin-bottom:16px}
+  .btn{padding:10px 16px;border:none;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;transition:opacity .15s}
   .btn:hover{opacity:.9}
   .btn:disabled{opacity:.5;cursor:not-allowed}
-  .btn-sm{width:auto;padding:6px 12px;font-size:13px;border-radius:6px}
+  .btn-block{width:100%}
+  .btn-sm{padding:6px 12px;font-size:13px;border-radius:6px}
   .btn-ghost{background:transparent;color:var(--accent-strong);border:1px solid var(--rule)}
+  .btn-danger{background:var(--bad)}
   .msg{font-size:13.5px;padding:10px 12px;border-radius:8px;margin-bottom:16px}
   .msg.err{background:var(--bad-soft);color:var(--bad)}
   .msg.ok{background:var(--good-soft);color:var(--good)}
+  .msg.warn{background:var(--warn-soft);color:var(--warn)}
   .hint{font-size:13px;color:var(--ink-faint);margin:0 0 16px}
 
-  /* ---------- app shell ---------- */
-  header{border-bottom:1px solid var(--rule);background:var(--raised)}
-  .bar{max-width:1080px;margin:0 auto;padding:14px 24px;display:flex;align-items:center;gap:16px}
-  .bar .name{font-weight:700;font-size:15px}
+  /* ── shell ── */
+  header{border-bottom:1px solid var(--rule);background:var(--raised);position:sticky;top:0;z-index:20}
+  .bar{max-width:1240px;margin:0 auto;padding:11px 20px;display:flex;align-items:center;gap:14px}
+  .bar .name{font-weight:700;font-size:14.5px;white-space:nowrap}
   .bar .spacer{flex:1}
-  .bar .who{font-size:13px;color:var(--ink-faint)}
-  main{max-width:1080px;margin:0 auto;padding:32px 24px 80px}
-  h2{font-size:19px;margin:0 0 4px}
-  .sub{color:var(--ink-soft);font-size:14.5px;margin:0 0 20px}
-  section{margin-bottom:44px}
+  .bar .who{font-size:12.5px;color:var(--ink-faint);white-space:nowrap}
+  .bar select{width:auto;min-width:170px;padding:6px 10px;font-size:13.5px}
+  nav.tabs{max-width:1240px;margin:0 auto;padding:0 20px;display:flex;gap:2px;overflow-x:auto}
+  nav.tabs button{background:none;border:none;padding:10px 14px;font-size:14px;color:var(--ink-faint);
+                  border-bottom:2px solid transparent;white-space:nowrap}
+  nav.tabs button:hover{color:var(--ink)}
+  nav.tabs button.on{color:var(--accent-strong);border-bottom-color:var(--accent);font-weight:600}
+  main{max-width:1240px;margin:0 auto;padding:26px 20px 90px}
 
-  /* ---------- company cards ---------- */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
-  .co{background:var(--raised);border:1px solid var(--rule);border-radius:12px;padding:18px;box-shadow:var(--shadow)}
-  .co .cn{font-weight:700;font-size:15px;line-height:1.3;margin-bottom:2px}
-  .co .cl{font-size:12px;color:var(--ink-faint);margin-bottom:12px}
-  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;
-        padding:3px 9px;border-radius:20px;font-family:ui-monospace,Menlo,monospace}
+  /* ── generic surfaces ── */
+  .panel{background:var(--raised);border:1px solid var(--rule);border-radius:12px;padding:20px;box-shadow:var(--shadow);margin-bottom:18px}
+  .empty{color:var(--ink-faint);font-size:14px;padding:10px 0}
+  .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .grow{flex:1}
+
+  /* ── stat tiles ── */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+  .tile{background:var(--raised);border:1px solid var(--rule);border-radius:12px;padding:15px 17px;box-shadow:var(--shadow)}
+  .tile .k{font-size:11.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin-bottom:6px}
+  .tile .v{font-size:22px;font-weight:700;letter-spacing:-.01em}
+  .tile .m{font-size:12px;color:var(--ink-faint);margin-top:3px}
+  .tile.accent .v{color:var(--accent-strong)}
+
+  /* ── tables ── */
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--rule);border-radius:12px;background:var(--raised);box-shadow:var(--shadow)}
+  table{border-collapse:collapse;width:100%;font-size:13.5px}
+  th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);
+     font-weight:600;padding:10px 12px;border-bottom:1px solid var(--rule);white-space:nowrap;background:var(--raised);
+     position:sticky;top:0}
+  td{padding:9px 12px;border-bottom:1px solid var(--rule-soft);vertical-align:middle;color:var(--ink-soft);white-space:nowrap}
+  tr:last-child td{border-bottom:none}
+  td.name{color:var(--ink);font-weight:600;white-space:normal;min-width:150px}
+  td.num,th.num{text-align:right;font-family:ui-monospace,Menlo,monospace;font-variant-numeric:tabular-nums}
+  td.num{color:var(--ink)}
+  tfoot td{border-top:2px solid var(--rule);border-bottom:none;font-weight:700;color:var(--ink);background:var(--sunken)}
+  tr.warn-row td{background:var(--warn-soft)}
+
+  /* ── pills ── */
+  .pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 8px;
+        border-radius:20px;font-family:ui-monospace,Menlo,monospace;white-space:nowrap}
   .pill.good{background:var(--good-soft);color:var(--good)}
   .pill.warn{background:var(--warn-soft);color:var(--warn)}
   .pill.mute{background:var(--mute-soft);color:var(--mute)}
+  .pill.bad{background:var(--bad-soft);color:var(--bad)}
   .dot{width:6px;height:6px;border-radius:50%;background:currentColor}
-  .feats{display:flex;flex-wrap:wrap;gap:5px;margin-top:12px;padding-top:12px;border-top:1px solid var(--rule-soft)}
+
+  /* ── company cards ── */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+  .co{background:var(--raised);border:1px solid var(--rule);border-radius:12px;padding:17px;box-shadow:var(--shadow)}
+  .co .cn{font-weight:700;font-size:14.5px;margin-bottom:2px}
+  .co .cl{font-size:12px;color:var(--ink-faint);margin-bottom:11px}
+  .feats{display:flex;flex-wrap:wrap;gap:5px;margin-top:11px;padding-top:11px;border-top:1px solid var(--rule-soft)}
   .feat{font-size:11px;padding:2px 7px;border-radius:5px;background:var(--mute-soft);color:var(--ink-faint)}
   .feat.on{background:var(--accent-soft);color:var(--accent-strong);font-weight:600}
 
-  /* ---------- xero panel ---------- */
-  .panel{background:var(--raised);border:1px solid var(--rule);border-radius:12px;padding:20px;box-shadow:var(--shadow)}
-  .link-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 0;border-bottom:1px solid var(--rule-soft)}
-  .link-row:last-child{border-bottom:none}
-  .link-row .orgn{font-weight:600;flex:1;min-width:180px}
-  select{padding:7px 10px;border:1px solid var(--rule);border-radius:6px;background:var(--paper);color:var(--ink);font:inherit;font-size:13.5px}
-  .empty{color:var(--ink-faint);font-size:14px;padding:8px 0}
+  /* ── modal ── */
+  .modal-bg{position:fixed;inset:0;background:rgba(10,16,22,.55);display:grid;place-items:center;padding:20px;z-index:50}
+  .modal{background:var(--raised);border:1px solid var(--rule);border-radius:14px;padding:24px;
+         width:100%;max-width:680px;max-height:88vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  .modal h3{margin:0 0 16px;font-size:17px}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+  @media(max-width:560px){.fields{grid-template-columns:1fr}}
+  .fields .full{grid-column:1/-1}
+  .fields label{margin-bottom:4px}
+  .fld-note{font-size:11.5px;color:var(--ink-faint);margin-top:3px;font-weight:400}
+  .modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--rule-soft)}
+  .check{display:flex;align-items:center;gap:8px;font-size:13.5px;color:var(--ink-soft)}
+  .check input{width:auto;margin:0}
 
-  @media(max-width:600px){ main{padding:24px 16px 60px} .bar{padding:12px 16px} }
+  .link{background:none;border:none;color:var(--accent-strong);padding:0;font-size:13.5px;text-decoration:underline}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);
+         padding:11px 20px;border-radius:10px;font-size:14px;z-index:100;box-shadow:0 8px 30px rgba(0,0,0,.3)}
+  @media(max-width:600px){main{padding:20px 14px 70px}.bar{padding:10px 14px}nav.tabs{padding:0 14px}}
 </style>
 </head>
 <body>
 
-<!-- ══════════════════ sign in ══════════════════ -->
+<!-- ═══════════ sign in ═══════════ -->
 <div id="signin">
   <div class="card">
     <div class="brand">CTG Internal</div>
@@ -124,18 +169,16 @@
       <input id="email" type="email" autocomplete="username" required>
       <label for="password">Password</label>
       <input id="password" type="password" autocomplete="current-password" required>
-      <button class="btn" type="submit" id="pwBtn">Sign in</button>
+      <button class="btn btn-block" type="submit" id="pwBtn">Sign in</button>
     </form>
 
     <form id="twoFaForm" class="hide">
       <p class="hint">Enter the 6-digit code from your authenticator app.</p>
       <label for="code">Authentication code</label>
-      <input id="code" class="mono" inputmode="numeric" autocomplete="one-time-code"
-             maxlength="6" pattern="[0-9]{6}" required>
-      <button class="btn" type="submit" id="twoFaBtn">Verify</button>
+      <input id="code" class="mono" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" required>
+      <button class="btn btn-block" type="submit" id="twoFaBtn">Verify</button>
     </form>
 
-    <!-- First-run only. Disappears permanently once the first admin exists. -->
     <form id="setupForm" class="hide">
       <p class="hint">This portal has no accounts yet. Create the first administrator — choose your own password; nobody else ever sees it.</p>
       <label for="suName">Your name</label>
@@ -146,35 +189,24 @@
       <input id="suPassword" type="password" autocomplete="new-password" minlength="12" required>
       <label for="suKey">Setup key</label>
       <input id="suKey" class="mono" type="text" required>
-      <button class="btn" type="submit" id="suBtn">Create administrator</button>
+      <button class="btn btn-block" type="submit" id="suBtn">Create administrator</button>
     </form>
   </div>
 </div>
 
-<!-- ══════════════════ app ══════════════════ -->
+<!-- ═══════════ app ═══════════ -->
 <div id="app" class="hide">
   <header>
     <div class="bar">
-      <span class="name">CTG Internal Finance Portal</span>
+      <span class="name">CTG Internal Finance</span>
+      <select id="companySel" title="Active company"></select>
       <span class="spacer"></span>
       <span class="who" id="who"></span>
       <button class="btn btn-sm btn-ghost" id="signOutBtn">Sign out</button>
     </div>
+    <nav class="tabs" id="tabs"></nav>
   </header>
-
-  <main>
-    <section>
-      <h2>Companies</h2>
-      <p class="sub">Xero connection status per company, and which modules are switched on.</p>
-      <div class="grid" id="coGrid"></div>
-    </section>
-
-    <section id="xeroSection" class="hide">
-      <h2>Xero connection</h2>
-      <p class="sub">One Xero grant covers every company. Each organisation is linked to its company by hand — a wrong link would post invoices into the wrong entity's books.</p>
-      <div class="panel" id="xeroPanel"></div>
-    </section>
-  </main>
+  <main id="view"></main>
 </div>
 
 <script src="./shared/config.js"></script>
@@ -187,230 +219,703 @@
   const esc = (x) => (x == null ? "" : String(x)).replace(/[&<>"']/g,
     (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
-  let ME = null, PERMS = null;
+  // Money crosses the wire as integer sen and is only ever turned into ringgit for display.
+  const rm  = (sen) => "RM " + (Number(sen||0)/100).toLocaleString("en-MY",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const rm0 = (sen) => "RM " + Math.round(Number(sen||0)/100).toLocaleString("en-MY");
+  const senFromInput = (v) => Math.round((parseFloat(String(v).replace(/[^0-9.\-]/g,"")) || 0) * 100);
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 
+  let ME=null, PERMS=null, COMPANIES=[], ACTIVE=null, TAB="overview";
+
+  function toast(text){
+    const el=document.createElement("div"); el.className="toast"; el.textContent=text;
+    document.body.appendChild(el); setTimeout(()=>el.remove(),2600);
+  }
+
+  // ═══════════ sign in ═══════════
   function showSignIn(message){
-    $("app").classList.add("hide");
-    $("signin").classList.remove("hide");
+    $("app").classList.add("hide"); $("signin").classList.remove("hide");
     if (message) showMsg(message);
   }
   function showMsg(text, kind){
-    const el = $("signinMsg");
-    el.textContent = text;
-    el.className = "msg " + (kind || "err");
-    el.classList.remove("hide");
+    const el=$("signinMsg"); el.textContent=text; el.className="msg "+(kind||"err"); el.classList.remove("hide");
   }
-  function clearMsg(){ $("signinMsg").classList.add("hide"); }
+  const clearMsg = () => $("signinMsg").classList.add("hide");
 
-  // ---- sign in ----
-  $("pwForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearMsg();
-    const btn = $("pwBtn"); btn.disabled = true; btn.textContent = "Signing in…";
+  $("pwForm").addEventListener("submit", async (e)=>{
+    e.preventDefault(); clearMsg();
+    const btn=$("pwBtn"); btn.disabled=true; btn.textContent="Signing in…";
     const res = await AUTH.signIn($("email").value.trim(), $("password").value);
-    btn.disabled = false; btn.textContent = "Sign in";
-    if (res.status === "error") return showMsg(res.message);
-    if (res.status === "2fa") {
-      $("pwForm").classList.add("hide");
-      $("twoFaForm").classList.remove("hide");
-      $("signinTitle").textContent = "Two-factor authentication";
-      $("code").focus();
-      return;
+    btn.disabled=false; btn.textContent="Sign in";
+    if (res.status==="error") return showMsg(res.message);
+    if (res.status==="2fa"){
+      $("pwForm").classList.add("hide"); $("twoFaForm").classList.remove("hide");
+      $("signinTitle").textContent="Two-factor authentication"; $("code").focus(); return;
     }
     await enterApp();
   });
 
-  $("twoFaForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearMsg();
-    const btn = $("twoFaBtn"); btn.disabled = true; btn.textContent = "Verifying…";
+  $("twoFaForm").addEventListener("submit", async (e)=>{
+    e.preventDefault(); clearMsg();
+    const btn=$("twoFaBtn"); btn.disabled=true; btn.textContent="Verifying…";
     const res = await AUTH.submitTwoFactor($("code").value.trim());
-    btn.disabled = false; btn.textContent = "Verify";
-    if (res.status === "error") { $("code").value = ""; return showMsg(res.message); }
+    btn.disabled=false; btn.textContent="Verify";
+    if (res.status==="error"){ $("code").value=""; return showMsg(res.message); }
     await enterApp();
   });
 
-  $("signOutBtn").addEventListener("click", async () => {
-    await AUTH.signOut();
-    location.reload();
-  });
-
-  // ---- first-run setup ----
-  $("setupForm").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    clearMsg();
-    const btn = $("suBtn"); btn.disabled = true; btn.textContent = "Creating…";
+  $("setupForm").addEventListener("submit", async (e)=>{
+    e.preventDefault(); clearMsg();
+    const btn=$("suBtn"); btn.disabled=true; btn.textContent="Creating…";
     const res = await API.call("bootstrap_admin", {
-      setup_key: $("suKey").value.trim(),
-      email: $("suEmail").value.trim(),
-      name: $("suName").value.trim(),
-      password: $("suPassword").value,
-      token: undefined,
+      setup_key:$("suKey").value.trim(), email:$("suEmail").value.trim(),
+      name:$("suName").value.trim(), password:$("suPassword").value, token:undefined,
     });
-    btn.disabled = false; btn.textContent = "Create administrator";
-    if (!res || res.ok !== true) return showMsg(AUTH.friendlyError(res && res.error));
-
-    // Sign straight in with what they just chose, so setup ends inside the portal rather
-    // than at a second form asking for the same credentials again.
+    btn.disabled=false; btn.textContent="Create administrator";
+    if (!res || res.ok!==true) return showMsg(AUTH.friendlyError(res && res.error));
     const signedIn = await AUTH.signIn($("suEmail").value.trim(), $("suPassword").value);
-    if (signedIn.status !== "ok") {
-      $("setupForm").classList.add("hide");
-      $("pwForm").classList.remove("hide");
-      return showMsg("Administrator created. Sign in to continue.", "ok");
+    if (signedIn.status!=="ok"){
+      $("setupForm").classList.add("hide"); $("pwForm").classList.remove("hide");
+      return showMsg("Administrator created. Sign in to continue.","ok");
     }
     await enterApp();
   });
 
-  // ---- app ----
+  $("signOutBtn").addEventListener("click", async ()=>{ await AUTH.signOut(); location.reload(); });
+
+  // ═══════════ shell ═══════════
+  const TABS = [
+    { key:"overview", label:"Overview" },
+    { key:"payroll",  label:"Payroll",   feature:"payroll" },
+    { key:"people",   label:"Employees", feature:"payroll" },
+    { key:"settings", label:"Settings" },
+  ];
+
   async function enterApp(){
     ME = await AUTH.currentUser();
     if (!ME) return showSignIn("Your session has expired. Sign in again.");
     PERMS = await AUTH.permissions();
-
-    $("signin").classList.add("hide");
-    $("app").classList.remove("hide");
+    $("signin").classList.add("hide"); $("app").classList.remove("hide");
     $("who").textContent = ME.name + " · " + (PERMS ? PERMS.label : ME.role);
 
-    await renderCompanies();
-    if (ME.role === "admin") {
-      $("xeroSection").classList.remove("hide");
-      await renderXero();
+    const res = await API.call("companies_list");
+    COMPANIES = (res && res.ok) ? res.companies : [];
+    const saved = (function(){ try { return localStorage.getItem("ctg_active_company"); } catch(_e){ return null; } })();
+    ACTIVE = COMPANIES.find((c)=>c.id===saved) || COMPANIES[0] || null;
+
+    $("companySel").innerHTML = COMPANIES.map((c)=>
+      '<option value="'+esc(c.id)+'"'+(ACTIVE&&c.id===ACTIVE.id?" selected":"")+">"+esc(c.short_name)+"</option>").join("");
+    $("companySel").onchange = (e)=>{
+      ACTIVE = COMPANIES.find((c)=>c.id===e.target.value) || null;
+      try { localStorage.setItem("ctg_active_company", ACTIVE ? ACTIVE.id : ""); } catch(_e){}
+      render();
+    };
+
+    renderTabs(); render();
+  }
+
+  function visibleTabs(){
+    const features = (PERMS && PERMS.features) || [];
+    return TABS.filter((t)=> !t.feature || features.indexOf(t.feature)>=0 || ME.role==="admin");
+  }
+
+  function renderTabs(){
+    $("tabs").innerHTML = visibleTabs().map((t)=>
+      '<button data-tab="'+t.key+'" class="'+(t.key===TAB?"on":"")+'">'+esc(t.label)+"</button>").join("");
+    $("tabs").querySelectorAll("button").forEach((b)=>{
+      b.onclick = ()=>{ TAB=b.dataset.tab; renderTabs(); render(); };
+    });
+  }
+
+  function render(){
+    const v=$("view");
+    if (!visibleTabs().some((t)=>t.key===TAB)) TAB = "overview";
+    if (TAB==="overview") return renderOverview(v);
+    if (TAB==="payroll")  return renderPayroll(v);
+    if (TAB==="people")   return renderPeople(v);
+    if (TAB==="settings") return renderSettings(v);
+  }
+
+  // ═══════════ overview / dashboard ═══════════
+  let DASH_SCOPE = "group";   // "group" | company id
+
+  async function renderOverview(v){
+    v.innerHTML =
+      '<div class="row" style="margin-bottom:16px"><div class="grow">'+
+      '<h2>Financial position</h2><p class="sub" style="margin:0" id="dashAsAt">Loading live figures from Xero…</p></div>'+
+      '<select id="dashScope" style="width:auto">'+
+        '<option value="group">All companies</option>'+
+        COMPANIES.map((c)=>'<option value="'+esc(c.id)+'"'+(DASH_SCOPE===c.id?" selected":"")+">"+esc(c.short_name)+"</option>").join("")+
+      "</select>"+
+      '<button class="btn btn-sm btn-ghost" id="dashRefresh">Refresh</button></div>'+
+      '<div id="dashBody"><p class="empty">Loading…</p></div>';
+    $("dashScope").value = DASH_SCOPE;
+    $("dashScope").onchange = (e)=>{ DASH_SCOPE=e.target.value; loadDashboard(); };
+    $("dashRefresh").onclick = ()=>loadDashboard();
+    loadDashboard();
+  }
+
+  async function loadDashboard(){
+    const box=$("dashBody"); if(!box) return;
+    box.innerHTML='<p class="empty">Reading live figures from Xero…</p>';
+    const params = DASH_SCOPE==="group" ? {} : { company_id: DASH_SCOPE };
+    const res = await API.call("dashboard", params);
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+
+    const asAtEl=$("dashAsAt");
+    if(asAtEl) asAtEl.textContent = "Live from Xero · as at "+fmtDateTime(res.as_at);
+
+    if(!res.companies.length){ box.innerHTML='<p class="empty">No companies available to your account.</p>'; return; }
+
+    const g=res.group;
+    let html="";
+
+    // Anything that failed is stated up front. A dashboard that silently drops a company
+    // reads as "we are owed less than we are", which is the worst possible way to be wrong.
+    if(g.errors && g.errors.length){
+      html+='<div class="msg warn" style="margin-bottom:16px"><strong>Some figures could not be read:</strong><ul style="margin:8px 0 0;padding-left:20px">'+
+        g.errors.map((e)=>"<li>"+esc(e.company)+" — "+esc(e.error)+"</li>").join("")+
+        "</ul>Totals below exclude these companies.</div>";
+    }
+    const noBank = res.companies.filter((c)=>c.connected && !c.bank_available);
+    if(noBank.length){
+      html+='<div class="msg warn" style="margin-bottom:16px"><strong>Bank balances not available for '+
+        noBank.map((c)=>esc(c.short_name)).join(", ")+".</strong> "+esc(noBank[0].bank_reason||"")+
+        ". Net position below therefore excludes cash for these companies — it is not zero, it is unknown.</div>";
+    }
+    const notConnected = res.companies.filter((c)=>!c.connected);
+    if(notConnected.length){
+      html+='<div class="msg warn" style="margin-bottom:16px">Not yet connected to Xero, so contributing nothing to these totals: '+
+        notConnected.map((c)=>esc(c.short_name)).join(", ")+"</div>";
+    }
+
+    html+='<div class="tiles">'+
+      tile("Owed to us", rm0(g.receivables_sen), "outstanding receivables", true)+
+      tile("We owe", rm0(g.payables_sen), "outstanding payables")+
+      (g.bank_complete
+        ? tile("In the bank", rm0(g.bank_sen), "across all accounts")
+        : tile("In the bank", g.bank_available_for ? rm0(g.bank_sen) : "not available",
+               g.bank_available_for ? g.bank_available_for+" of "+g.companies_connected+" companies" : "Xero permission needed"))+
+      tile("Net position", rm0(g.net_position_sen),
+           g.bank_complete ? "receivables + bank − payables" : "receivables − payables (bank not included)", true)+
+      tile("Overdue to us", rm0(g.overdue_receivables_sen), pctOf(g.overdue_receivables_sen,g.receivables_sen)+" of receivables")+
+      "</div>";
+
+    html+='<div class="panel"><h2 style="font-size:16px">Who owes us — ageing</h2>'+
+      '<p class="sub">Outstanding customer invoices by how far past due they are.</p>'+
+      ageingBar(res.buckets, g.ar_ageing, g.receivables_sen)+"</div>";
+
+    html+='<div class="panel"><h2 style="font-size:16px">What we owe — ageing</h2>'+
+      '<p class="sub">Outstanding supplier bills by how far past due they are.</p>'+
+      ageingBar(res.buckets, g.ap_ageing, g.payables_sen)+"</div>";
+
+    // Per-company breakdown, always shown so the group total can be traced to its parts.
+    html+='<h2 style="font-size:16px;margin:24px 0 4px">By company</h2>'+
+      '<p class="sub">Every figure above, split by entity.</p>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>Company</th><th class="num">Owed to us</th>'+
+      '<th class="num">Overdue</th><th class="num">We owe</th><th class="num">Bank</th>'+
+      '<th class="num">Net</th><th class="num">Open invoices</th></tr></thead><tbody>'+
+      res.companies.map((c)=>{
+        const net=c.receivables_sen+(c.bank_sen||0)-c.payables_sen;
+        return "<tr>"+
+          "<td class='name'>"+esc(c.short_name)+
+            (!c.connected?' <span class="pill warn">no Xero</span>':"")+
+            (c.error?' <span class="pill bad">error</span>':"")+"</td>"+
+          "<td class='num'>"+rm(c.receivables_sen)+"</td>"+
+          "<td class='num'>"+(c.overdue_receivables_sen?'<span style="color:var(--bad)">'+rm(c.overdue_receivables_sen)+"</span>":"—")+"</td>"+
+          "<td class='num'>"+rm(c.payables_sen)+"</td>"+
+          "<td class='num'>"+(c.bank_available ? rm(c.bank_sen) : '<span style="color:var(--ink-faint)" title="'+esc(c.bank_reason||"")+'">n/a</span>')+"</td>"+
+          "<td class='num'><strong>"+rm(net)+"</strong></td>"+
+          "<td class='num'>"+(c.invoice_counts.ar_open+c.invoice_counts.ap_open)+"</td>"+
+        "</tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td>Group</td>"+
+      "<td class='num'>"+rm(g.receivables_sen)+"</td>"+
+      "<td class='num'>"+rm(g.overdue_receivables_sen)+"</td>"+
+      "<td class='num'>"+rm(g.payables_sen)+"</td>"+
+      "<td class='num'>"+rm(g.bank_sen)+"</td>"+
+      "<td class='num'>"+rm(g.net_position_sen)+"</td>"+
+      "<td class='num'></td></tr></tfoot></table></div>";
+
+    // Debtors and creditors, merged across whatever scope is selected.
+    const debtors=mergeParties(res.companies,"top_debtors");
+    const creditors=mergeParties(res.companies,"top_creditors");
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px" id="partyCols">'+
+      partyTable("Largest debtors","Who owes us the most",debtors,"owed")+
+      partyTable("Largest creditors","Who we owe the most",creditors,"owing")+
+      "</div>";
+
+    box.innerHTML=html;
+    if (window.matchMedia("(max-width:760px)").matches){
+      const pc=$("partyCols"); if(pc) pc.style.gridTemplateColumns="1fr";
     }
   }
 
-  async function renderCompanies(){
-    const res = await API.call("companies_list");
-    const grid = $("coGrid");
-    if (!res.ok) { grid.innerHTML = '<p class="empty">Couldn\'t load companies: ' + esc(AUTH.friendlyError(res.error)) + "</p>"; return; }
-    if (!res.companies.length) { grid.innerHTML = '<p class="empty">No companies have been shared with your account yet.</p>'; return; }
+  function pctOf(part,whole){
+    if(!whole) return "none outstanding";
+    return Math.round((part/whole)*100)+"%";
+  }
 
-    grid.innerHTML = res.companies.map((c) => {
-      const connected = !!c.xero_tenant_id;
-      const pill = connected
-        ? '<span class="pill good"><span class="dot"></span>Xero connected</span>'
-        : (c.xero_target_live_date
-            ? '<span class="pill warn"><span class="dot"></span>Xero from ' + esc(fmtDate(c.xero_target_live_date)) + "</span>"
-            : '<span class="pill mute"><span class="dot"></span>Xero not connected</span>');
-      const feats = [
-        ["AP", c.ap_automation_enabled],
-        ["O2O", c.o2o_invoicing_enabled],
-        ["Payroll", c.payroll_enabled],
-        ["Gateway fees", c.gateway_fee_tracking_enabled],
-      ].map(([label, on]) => '<span class="feat' + (on ? " on" : "") + '">' + esc(label) + "</span>").join("");
+  function ageingBar(buckets, ageing, total){
+    if(!total) return '<p class="empty">Nothing outstanding.</p>';
+    const colors=["var(--good)","var(--accent)","var(--warn)","var(--copper,#A85D25)","var(--bad)"];
+    let bar='<div style="display:flex;height:12px;border-radius:6px;overflow:hidden;margin-bottom:14px;background:var(--mute-soft)">';
+    buckets.forEach((b,i)=>{
+      const v=ageing[b.key]||0;
+      if(v>0) bar+='<div title="'+esc(b.label)+'" style="width:'+((v/total)*100)+'%;background:'+colors[i%colors.length]+'"></div>';
+    });
+    bar+="</div>";
+    bar+='<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr>'+
+      buckets.map((b)=>'<th class="num">'+esc(b.label)+"</th>").join("")+"</tr></thead><tbody><tr>"+
+      buckets.map((b)=>{
+        const v=ageing[b.key]||0;
+        const overdue=b.key!=="current"&&v>0;
+        return "<td class='num'"+(overdue?" style='color:var(--bad);font-weight:600'":"")+">"+(v?rm(v):"—")+"</td>";
+      }).join("")+"</tr></tbody></table></div>";
+    return bar;
+  }
 
-      return '<div class="co">' +
-        '<div class="cn">' + esc(c.short_name) + "</div>" +
-        '<div class="cl">' + esc(c.legal_name) + "</div>" +
-        pill +
-        '<div class="feats">' + feats + "</div>" +
+  function mergeParties(companies, key){
+    const m=new Map();
+    for(const c of companies){
+      for(const p of (c[key]||[])){
+        const cur=m.get(p.name)||{amount_sen:0,oldest_days:0,companies:new Set()};
+        cur.amount_sen+=p.amount_sen;
+        cur.oldest_days=Math.max(cur.oldest_days,p.oldest_days);
+        cur.companies.add(c.short_name);
+        m.set(p.name,cur);
+      }
+    }
+    return [...m.entries()].map(([name,v])=>({name,...v,companies:[...v.companies]}))
+      .sort((a,b)=>b.amount_sen-a.amount_sen).slice(0,10);
+  }
+
+  function partyTable(title, subtitle, rows, kind){
+    if(!rows.length){
+      return '<div class="panel" style="margin:0"><h2 style="font-size:16px">'+esc(title)+"</h2>"+
+             '<p class="sub">'+esc(subtitle)+'</p><p class="empty">Nothing outstanding.</p></div>';
+    }
+    return '<div class="panel" style="margin:0"><h2 style="font-size:16px">'+esc(title)+"</h2>"+
+      '<p class="sub">'+esc(subtitle)+"</p>"+
+      '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Name</th>'+
+      '<th class="num">Amount</th><th class="num">Oldest</th></tr></thead><tbody>'+
+      rows.map((r)=>"<tr><td class='name'>"+esc(r.name)+
+        (r.companies.length>1?'<div style="font-size:11px;color:var(--ink-faint);font-weight:400">'+esc(r.companies.join(", "))+"</div>":"")+
+        "</td><td class='num'>"+rm(r.amount_sen)+"</td>"+
+        "<td class='num'>"+(r.oldest_days>0
+          ? '<span style="color:var(--bad)">'+r.oldest_days+"d</span>"
+          : '<span class="pill good">current</span>')+"</td></tr>").join("")+
+      "</tbody></table></div></div>";
+  }
+
+  function fmtDateTime(iso){
+    try {
+      return new Date(iso).toLocaleString("en-MY",
+        {day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    } catch(_e){ return iso; }
+  }
+
+  // ═══════════ employees ═══════════
+  async function renderPeople(v){
+    if (!ACTIVE) { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
+    v.innerHTML = '<div class="row" style="margin-bottom:14px"><div class="grow">'+
+      '<h2>Employees</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+'</p></div>'+
+      '<button class="btn btn-sm" id="addEmp">Add employee</button></div>'+
+      '<div id="empList"><p class="empty">Loading…</p></div>';
+    $("addEmp").onclick = ()=>employeeModal(null);
+
+    const res = await API.call("hr_employees_list", { company_id: ACTIVE.id, include_resigned: true });
+    const box=$("empList");
+    if (!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if (!res.employees.length){
+      box.innerHTML='<div class="panel"><p class="empty">No employees yet. Add the first one to start running payroll.</p></div>'; return;
+    }
+    box.innerHTML='<div class="tbl-wrap"><table><thead><tr>'+
+      "<th>No.</th><th>Name</th><th>Position</th><th class='num'>Basic</th><th class='num'>Allowance</th>"+
+      "<th>Status</th><th></th></tr></thead><tbody>"+
+      res.employees.map((e)=>
+        "<tr><td class='mono'>"+esc(e.emp_no)+"</td>"+
+        "<td class='name'>"+esc(e.name)+"</td>"+
+        "<td>"+esc(e.position||"—")+"</td>"+
+        "<td class='num'>"+rm(e.basic_salary_sen)+"</td>"+
+        "<td class='num'>"+rm(e.fixed_allowance_sen)+"</td>"+
+        "<td>"+(e.status==="active"?'<span class="pill good">active</span>':'<span class="pill mute">resigned</span>')+"</td>"+
+        "<td><button class='link' data-id='"+esc(e.id)+"'>Edit</button></td></tr>").join("")+
+      "</tbody></table></div>";
+    box.querySelectorAll("button.link").forEach((b)=>{
+      b.onclick = ()=>employeeModal(res.employees.find((e)=>e.id===b.dataset.id));
+    });
+  }
+
+  function employeeModal(emp){
+    const e = emp || {};
+    const val = (k, d) => (e[k]==null ? (d===undefined?"":d) : e[k]);
+    const money = (k) => e[k]!=null ? (Number(e[k])/100).toFixed(2) : "";
+    const bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML =
+      '<div class="modal"><h3>'+(emp?"Edit employee":"Add employee")+"</h3>"+
+      '<div id="empMsg" class="msg err hide"></div>'+
+      '<div class="fields">'+
+        '<div><label>Employee number</label><input id="f_emp_no" value="'+esc(val("emp_no"))+'"></div>'+
+        '<div><label>Full name</label><input id="f_name" value="'+esc(val("name"))+'"></div>'+
+        '<div><label>IC number</label><input id="f_ic" class="mono" value="'+esc(val("ic_no"))+'"><div class="fld-note">Digits only. Also used as the payslip PDF password.</div></div>'+
+        '<div><label>Email</label><input id="f_email" type="email" value="'+esc(val("email"))+'"></div>'+
+        '<div><label>Date of birth</label><input id="f_dob" type="date" value="'+esc(val("date_of_birth"))+'"><div class="fld-note">Drives EPF rates, SOCSO category and EIS eligibility.</div></div>'+
+        '<div><label>Join date</label><input id="f_join" type="date" value="'+esc(val("join_date"))+'"></div>'+
+        '<div><label>Department</label><input id="f_dept" value="'+esc(val("department"))+'"></div>'+
+        '<div><label>Position</label><input id="f_pos" value="'+esc(val("position"))+'"></div>'+
+        '<div><label>Basic salary (RM/month)</label><input id="f_basic" class="mono" inputmode="decimal" value="'+esc(money("basic_salary_sen"))+'"></div>'+
+        '<div><label>Fixed allowance (RM/month)</label><input id="f_allow" class="mono" inputmode="decimal" value="'+esc(money("fixed_allowance_sen"))+'"></div>'+
+        '<div><label>EPF number</label><input id="f_epfno" value="'+esc(val("epf_no"))+'"></div>'+
+        '<div><label>SOCSO number</label><input id="f_socsono" value="'+esc(val("socso_no"))+'"></div>'+
+        '<div><label>Income tax number</label><input id="f_taxno" value="'+esc(val("income_tax_no"))+'"></div>'+
+        '<div><label>Marital status</label><select id="f_marital">'+
+          ["","single","married","divorced","widowed"].map((m)=>'<option value="'+m+'"'+(val("marital_status")===m?" selected":"")+">"+(m||"—")+"</option>").join("")+
+        "</select></div>"+
+        '<div><label>Children under 18</label><input id="f_children" type="number" min="0" value="'+esc(val("num_children",0))+'"></div>'+
+        '<div><label>Bank</label><input id="f_bank" value="'+esc(val("bank_name"))+'"></div>'+
+        '<div><label>Bank account</label><input id="f_bankacc" class="mono" value="'+esc(val("bank_account_no"))+'"></div>'+
+        '<div><label>Status</label><select id="f_status">'+
+          ["active","resigned"].map((s)=>'<option value="'+s+'"'+(val("status","active")===s?" selected":"")+">"+s+"</option>").join("")+
+        "</select></div>"+
+        '<div class="full" style="display:flex;gap:18px;flex-wrap:wrap;padding-top:4px">'+
+          '<label class="check"><input type="checkbox" id="f_citizen" '+(val("is_citizen",true)!==false?"checked":"")+"> Malaysian citizen or PR</label>"+
+          '<label class="check"><input type="checkbox" id="f_resident" '+(val("is_resident",true)!==false?"checked":"")+"> Tax resident</label>"+
+          '<label class="check"><input type="checkbox" id="f_spouse" '+(val("spouse_working")===true?"checked":"")+"> Spouse working</label>"+
+        "</div>"+
+        '<div class="full" style="display:flex;gap:18px;flex-wrap:wrap">'+
+          '<label class="check"><input type="checkbox" id="f_epf" '+(val("epf_eligible",true)!==false?"checked":"")+"> EPF</label>"+
+          '<label class="check"><input type="checkbox" id="f_socso" '+(val("socso_eligible",true)!==false?"checked":"")+"> SOCSO</label>"+
+          '<label class="check"><input type="checkbox" id="f_eis" '+(val("eis_eligible",true)!==false?"checked":"")+"> EIS</label>"+
+        "</div>"+
+        '<div class="full" style="border-top:1px solid var(--rule-soft);padding-top:14px;margin-top:6px">'+
+          '<label style="margin-bottom:2px">Opening year-to-date (only if this company started payroll here mid-year)</label>'+
+          '<div class="fld-note" style="margin-bottom:10px">Malaysia\'s tax year is the calendar year and PCB is cumulative. Without these, PCB is calculated as if the tax year starts now, which under-deducts every remaining month.</div>'+
+        "</div>"+
+        '<div><label>YTD months paid</label><input id="f_ytdm" type="number" min="0" max="12" value="'+esc(val("ytd_months",0))+'"></div>'+
+        '<div><label>YTD gross (RM)</label><input id="f_ytdg" class="mono" inputmode="decimal" value="'+esc(money("ytd_gross_sen"))+'"></div>'+
+        '<div><label>YTD employee EPF (RM)</label><input id="f_ytde" class="mono" inputmode="decimal" value="'+esc(money("ytd_epf_ee_sen"))+'"></div>'+
+        '<div><label>YTD PCB paid (RM)</label><input id="f_ytdp" class="mono" inputmode="decimal" value="'+esc(money("ytd_pcb_sen"))+'"></div>'+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="empCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="empSave">Save</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",(ev)=>{ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#empCancel").onclick = ()=>bg.remove();
+
+    bg.querySelector("#empSave").onclick = async ()=>{
+      const btn=bg.querySelector("#empSave"); btn.disabled=true; btn.textContent="Saving…";
+      const payload = {
+        id: emp ? emp.id : undefined,
+        emp_no: bg.querySelector("#f_emp_no").value.trim(),
+        name: bg.querySelector("#f_name").value.trim(),
+        ic_no: bg.querySelector("#f_ic").value.trim(),
+        email: bg.querySelector("#f_email").value.trim(),
+        date_of_birth: bg.querySelector("#f_dob").value || null,
+        join_date: bg.querySelector("#f_join").value || null,
+        department: bg.querySelector("#f_dept").value.trim(),
+        position: bg.querySelector("#f_pos").value.trim(),
+        basic_salary_sen: senFromInput(bg.querySelector("#f_basic").value),
+        fixed_allowance_sen: senFromInput(bg.querySelector("#f_allow").value),
+        epf_no: bg.querySelector("#f_epfno").value.trim(),
+        socso_no: bg.querySelector("#f_socsono").value.trim(),
+        income_tax_no: bg.querySelector("#f_taxno").value.trim(),
+        marital_status: bg.querySelector("#f_marital").value || null,
+        num_children: parseInt(bg.querySelector("#f_children").value||"0",10),
+        bank_name: bg.querySelector("#f_bank").value.trim(),
+        bank_account_no: bg.querySelector("#f_bankacc").value.trim(),
+        status: bg.querySelector("#f_status").value,
+        is_citizen: bg.querySelector("#f_citizen").checked,
+        is_resident: bg.querySelector("#f_resident").checked,
+        spouse_working: bg.querySelector("#f_spouse").checked,
+        epf_eligible: bg.querySelector("#f_epf").checked,
+        socso_eligible: bg.querySelector("#f_socso").checked,
+        eis_eligible: bg.querySelector("#f_eis").checked,
+        ytd_months: parseInt(bg.querySelector("#f_ytdm").value||"0",10),
+        ytd_gross_sen: senFromInput(bg.querySelector("#f_ytdg").value),
+        ytd_epf_ee_sen: senFromInput(bg.querySelector("#f_ytde").value),
+        ytd_pcb_sen: senFromInput(bg.querySelector("#f_ytdp").value),
+      };
+      const res = await API.call("hr_employee_save", { company_id: ACTIVE.id, employee: payload });
+      btn.disabled=false; btn.textContent="Save";
+      if (!res.ok){
+        const m=bg.querySelector("#empMsg"); m.textContent=res.error; m.classList.remove("hide");
+        bg.querySelector(".modal").scrollTop=0; return;
+      }
+      bg.remove(); toast(emp?"Employee updated":"Employee added"); renderPeople($("view"));
+    };
+  }
+
+  // ═══════════ payroll ═══════════
+  const today = new Date();
+  let PR_YEAR = today.getFullYear(), PR_MONTH = today.getMonth()+1;
+
+  async function renderPayroll(v){
+    if (!ACTIVE) { v.innerHTML='<p class="empty">Select a company first.</p>'; return; }
+    const years=[]; for(let y=today.getFullYear()+1;y>=today.getFullYear()-2;y--) years.push(y);
+    v.innerHTML =
+      '<div class="row" style="margin-bottom:16px"><div class="grow">'+
+      '<h2>Payroll</h2><p class="sub" style="margin:0">'+esc(ACTIVE.short_name)+'</p></div>'+
+      '<select id="prMonth" style="width:auto">'+MONTHS.map((m,i)=>'<option value="'+(i+1)+'"'+(i+1===PR_MONTH?" selected":"")+">"+m+"</option>").join("")+"</select>"+
+      '<select id="prYear" style="width:auto">'+years.map((y)=>'<option'+(y===PR_YEAR?" selected":"")+">"+y+"</option>").join("")+"</select>"+
+      "</div><div id="+'"prBody"'+'><p class="empty">Loading…</p></div>';
+    $("prMonth").onchange=(e)=>{ PR_MONTH=parseInt(e.target.value,10); loadPayroll(); };
+    $("prYear").onchange=(e)=>{ PR_YEAR=parseInt(e.target.value,10); loadPayroll(); };
+    loadPayroll();
+  }
+
+  async function loadPayroll(){
+    const box=$("prBody"); if(!box) return;
+    box.innerHTML='<p class="empty">Loading…</p>';
+    const res = await API.call("hr_payroll_run_get", { company_id:ACTIVE.id, year:PR_YEAR, month:PR_MONTH });
+    if (!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if (!res.rows.length){
+      box.innerHTML='<div class="panel"><p class="empty">No active employees in this company. Add employees before running payroll.</p></div>'; return;
+    }
+
+    const finalised = res.status==="finalised";
+    const t=res.totals;
+    const allWarnings = res.rows.flatMap((r)=>r.warnings||[]);
+
+    let html = '<div class="tiles">'+
+      tile("Headcount", String(t.headcount), "", true)+
+      tile("Gross pay", rm0(t.gross_sen), "before deductions")+
+      tile("Net pay", rm0(t.net_sen), "to bank accounts", true)+
+      tile("Statutory (employee)", rm0(t.epf_ee_sen+t.socso_ee_sen+t.eis_ee_sen+t.skbbk_sen+t.pcb_sen), "EPF, SOCSO, EIS, PCB")+
+      tile("Employer cost", rm0(t.employer_cost_sen), "gross + employer contributions")+
       "</div>";
-    }).join("");
+
+    html += '<div class="panel" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'+
+      (finalised
+        ? '<span class="pill good"><span class="dot"></span>Finalised</span><span class="sub" style="margin:0">'+
+          MONTHS[PR_MONTH-1]+" "+PR_YEAR+" is locked. Payslip figures below are the stored record.</span>"+
+          '<span class="grow"></span>'+(ME.role==="admin"?'<button class="btn btn-sm btn-ghost" id="reopenBtn">Reopen</button>':"")
+        : '<span class="pill warn"><span class="dot"></span>Draft</span><span class="sub" style="margin:0">'+
+          "Edit any row, then finalise to lock the month and issue payslips.</span>"+
+          '<span class="grow"></span><button class="btn btn-sm" id="finaliseBtn">Finalise '+MONTHS[PR_MONTH-1]+"</button>")+
+      "</div>";
+
+    if (allWarnings.length){
+      const uniq=[...new Set(allWarnings)];
+      html += '<div class="msg warn" style="margin-bottom:18px"><strong>'+uniq.length+
+        " point"+(uniq.length===1?"":"s")+" to check before finalising:</strong><ul style='margin:8px 0 0;padding-left:20px'>"+
+        uniq.map((w)=>"<li>"+esc(w)+"</li>").join("")+"</ul></div>";
+    }
+
+    html += '<div class="tbl-wrap"><table><thead><tr>'+
+      "<th>No.</th><th>Name</th><th class='num'>Basic</th><th class='num'>Additions</th>"+
+      "<th class='num'>Gross</th><th class='num'>EPF</th><th class='num'>SOCSO</th><th class='num'>EIS</th>"+
+      "<th class='num'>SKBBK</th><th class='num'>PCB</th><th class='num'>Net</th>"+(finalised?"":"<th></th>")+
+      "</tr></thead><tbody>"+
+      res.rows.map((r)=>{
+        const c=r.computed, adds=(r.adjustments||[]).filter((a)=>a.kind!=="deduction"&&a.kind!=="unpaid_leave")
+          .reduce((s,a)=>s+Number(a.amount_sen||0),0);
+        return "<tr"+(r.warnings&&r.warnings.length?" class='warn-row'":"")+">"+
+          "<td class='mono'>"+esc(r.employee.emp_no||"")+"</td>"+
+          "<td class='name'>"+esc(r.employee.name)+"</td>"+
+          "<td class='num'>"+rm(r.employee.basic_salary_sen||0)+"</td>"+
+          "<td class='num'>"+(adds?rm(adds):"—")+"</td>"+
+          "<td class='num'>"+rm(c.gross_sen)+"</td>"+
+          "<td class='num'>"+rm(c.epf_ee_sen)+"</td>"+
+          "<td class='num'>"+rm(c.socso_ee_sen)+"</td>"+
+          "<td class='num'>"+rm(c.eis_ee_sen)+"</td>"+
+          "<td class='num'>"+rm(c.skbbk_sen||0)+"</td>"+
+          "<td class='num'>"+rm(c.pcb_sen)+"</td>"+
+          "<td class='num'><strong>"+rm(c.net_sen)+"</strong></td>"+
+          (finalised?"":"<td><button class='link' data-emp='"+esc(r.employee.id)+"'>Edit</button></td>")+
+        "</tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td colspan='4'>Total — "+t.headcount+" employees</td>"+
+      "<td class='num'>"+rm(t.gross_sen)+"</td><td class='num'>"+rm(t.epf_ee_sen)+"</td>"+
+      "<td class='num'>"+rm(t.socso_ee_sen)+"</td><td class='num'>"+rm(t.eis_ee_sen)+"</td>"+
+      "<td class='num'>"+rm(t.skbbk_sen)+"</td><td class='num'>"+rm(t.pcb_sen)+"</td>"+
+      "<td class='num'>"+rm(t.net_sen)+"</td>"+(finalised?"":"<td></td>")+"</tr></tfoot></table></div>";
+
+    box.innerHTML = html;
+
+    const fb=$("finaliseBtn");
+    if (fb) fb.onclick = ()=>confirmFinalise(res.totals);
+    const rb=$("reopenBtn");
+    if (rb) rb.onclick = ()=>confirmReopen();
+    box.querySelectorAll("button.link[data-emp]").forEach((b)=>{
+      b.onclick = ()=>adjustmentsModal(res.rows.find((r)=>r.employee.id===b.dataset.emp));
+    });
+  }
+
+  function tile(k,v,m,accent){
+    return '<div class="tile'+(accent?" accent":"")+'"><div class="k">'+esc(k)+'</div><div class="v num">'+esc(v)+"</div>"+
+           (m?'<div class="m">'+esc(m)+"</div>":"")+"</div>";
+  }
+
+  function adjustmentsModal(row){
+    const kinds=[["bonus","Bonus"],["overtime","Overtime"],["allowance","Other allowance"],
+                 ["deduction","Deduction"],["unpaid_leave","Unpaid leave"],["basic_override","Basic salary override"]];
+    const cur={}; (row.adjustments||[]).forEach((a)=>{ cur[a.kind]=(cur[a.kind]||0)+Number(a.amount_sen||0); });
+    const bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:460px"><h3>'+esc(row.employee.name)+" — "+MONTHS[PR_MONTH-1]+" "+PR_YEAR+"</h3>"+
+      '<div id="adjMsg" class="msg err hide"></div>'+
+      kinds.map(([k,label])=>
+        '<div style="margin-bottom:12px"><label>'+label+' (RM)</label>'+
+        '<input class="mono adj" data-kind="'+k+'" inputmode="decimal" value="'+(cur[k]?(cur[k]/100).toFixed(2):"")+'">'+
+        (k==="basic_override"?'<div class="fld-note">Replaces the contract salary for this month only.</div>':"")+
+        (k==="unpaid_leave"?'<div class="fld-note">Reduces gross pay, and therefore every statutory contribution.</div>':"")+
+        "</div>").join("")+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="adjCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="adjSave">Save</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",(ev)=>{ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#adjCancel").onclick=()=>bg.remove();
+    bg.querySelector("#adjSave").onclick=async ()=>{
+      const btn=bg.querySelector("#adjSave"); btn.disabled=true; btn.textContent="Saving…";
+      const adjustments=[...bg.querySelectorAll("input.adj")].map((i)=>({
+        kind:i.dataset.kind, amount_sen:senFromInput(i.value),
+      })).filter((a)=>a.amount_sen>0);
+      const res=await API.call("hr_payroll_adjustments_save",{
+        company_id:ACTIVE.id, year:PR_YEAR, month:PR_MONTH, employee_id:row.employee.id, adjustments,
+      });
+      btn.disabled=false; btn.textContent="Save";
+      if(!res.ok){ const m=bg.querySelector("#adjMsg"); m.textContent=res.error; m.classList.remove("hide"); return; }
+      bg.remove(); toast("Saved"); loadPayroll();
+    };
+  }
+
+  function confirmFinalise(totals){
+    const bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:460px"><h3>Finalise '+MONTHS[PR_MONTH-1]+" "+PR_YEAR+"?</h3>"+
+      '<p class="sub">This locks the month and stores every payslip as the permanent record. '+
+      "Figures are recalculated on the server at the moment you confirm.</p>"+
+      '<div class="panel" style="margin:0 0 4px"><div class="row"><span class="grow">Employees</span><strong class="num">'+totals.headcount+"</strong></div>"+
+      '<div class="row"><span class="grow">Net pay</span><strong class="num">'+rm(totals.net_sen)+"</strong></div>"+
+      '<div class="row"><span class="grow">Employer cost</span><strong class="num">'+rm(totals.employer_cost_sen)+"</strong></div></div>"+
+      '<div id="finMsg" class="msg err hide"></div>'+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="finCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="finGo">Finalise</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",(ev)=>{ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#finCancel").onclick=()=>bg.remove();
+    bg.querySelector("#finGo").onclick=async ()=>{
+      const btn=bg.querySelector("#finGo"); btn.disabled=true; btn.textContent="Finalising…";
+      const res=await API.call("hr_payroll_finalise",{ company_id:ACTIVE.id, year:PR_YEAR, month:PR_MONTH });
+      btn.disabled=false; btn.textContent="Finalise";
+      if(!res.ok){ const m=bg.querySelector("#finMsg"); m.textContent=res.error; m.classList.remove("hide"); return; }
+      bg.remove(); toast("Finalised — "+res.headcount+" payslips"); loadPayroll();
+    };
+  }
+
+  function confirmReopen(){
+    const bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:440px"><h3>Reopen '+MONTHS[PR_MONTH-1]+" "+PR_YEAR+"?</h3>"+
+      '<p class="sub">The stored payslips for this month are deleted and the month returns to draft. '+
+      "Anyone who has already been given a payslip for this month will have one that no longer matches.</p>"+
+      '<div id="roMsg" class="msg err hide"></div>'+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="roCancel">Cancel</button>'+
+      '<button class="btn btn-sm btn-danger" id="roGo">Reopen</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",(ev)=>{ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#roCancel").onclick=()=>bg.remove();
+    bg.querySelector("#roGo").onclick=async ()=>{
+      const btn=bg.querySelector("#roGo"); btn.disabled=true; btn.textContent="Reopening…";
+      const res=await API.call("hr_payroll_reopen",{ company_id:ACTIVE.id, year:PR_YEAR, month:PR_MONTH });
+      btn.disabled=false; btn.textContent="Reopen";
+      if(!res.ok){ const m=bg.querySelector("#roMsg"); m.textContent=res.error; m.classList.remove("hide"); return; }
+      bg.remove(); toast("Reopened"); loadPayroll();
+    };
+  }
+
+  // ═══════════ settings ═══════════
+  async function renderSettings(v){
+    v.innerHTML='<h2>Settings</h2><p class="sub">Companies and the Xero connection.</p>'+
+      '<div id="setCompanies"></div>'+
+      (ME.role==="admin"?'<h2 style="margin-top:28px">Xero connection</h2>'+
+        '<p class="sub">One Xero grant covers every company. Each organisation is linked by hand — a wrong link posts invoices into the wrong entity\'s books.</p>'+
+        '<div class="panel" id="xeroPanel"><p class="empty">Loading…</p></div>':"");
+
+    const res = await API.call("companies_list");
+    $("setCompanies").innerHTML = (res.ok?res.companies:[]).map((c)=>
+      '<div class="co" style="margin-bottom:10px"><div class="cn">'+esc(c.short_name)+"</div>"+
+      '<div class="cl">'+esc(c.legal_name)+(c.registration_no?" · "+esc(c.registration_no):"")+"</div>"+
+      (c.xero_tenant_id?'<span class="pill good"><span class="dot"></span>Xero connected</span>'
+                       :'<span class="pill warn"><span class="dot"></span>Not connected</span>')+
+      "</div>").join("");
+
+    if (ME.role==="admin") renderXero();
   }
 
   async function renderXero(){
-    const res = await API.call("xero_status");
-    const panel = $("xeroPanel");
-    if (!res.ok) { panel.innerHTML = '<p class="empty">' + esc(AUTH.friendlyError(res.error)) + "</p>"; return; }
+    const panel=$("xeroPanel"); if(!panel) return;
+    const res=await API.call("xero_status");
+    if(!res.ok){ panel.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
 
-    // Xero grants one organisation per authorisation, so the connect action stays available
-    // after the first success -- otherwise there is no way to add the remaining companies.
-    // Each run adds to the same grant; nothing already connected is disturbed.
-    const connectBtn = (label) =>
-      '<button class="btn btn-sm" id="connectBtn">' + label + "</button>";
-
-    const wireConnect = () => {
-      const btn = $("connectBtn");
-      if (!btn) return;
-      btn.addEventListener("click", async () => {
-        const r = await API.call("xero_connect_url");
-        if (!r.ok) return alert("Can't start the Xero connection: " + r.error);
-        window.open(r.url, "_blank", "noopener");
-      });
+    const connectBtn=(label)=>'<button class="btn btn-sm" id="connectBtn">'+label+"</button>";
+    const wireConnect=()=>{
+      const b=$("connectBtn"); if(!b) return;
+      b.onclick=async ()=>{
+        const r=await API.call("xero_connect_url");
+        if(!r.ok) return alert("Can't start the Xero connection: "+r.error);
+        window.open(r.url,"_blank","noopener");
+      };
     };
 
-    if (!res.connected) {
-      panel.innerHTML =
-        '<p class="sub" style="margin:0 0 14px">No Xero organisation is connected yet.</p>' +
-        connectBtn("Connect Xero");
-      wireConnect();
-      return;
+    if(!res.connected){
+      panel.innerHTML='<p class="sub">No Xero organisation is connected yet.</p>'+connectBtn("Connect Xero");
+      return wireConnect();
     }
 
-    const unlinked = res.unlinked_orgs || [];
-    const companyOptions = (res.companies || [])
-      .filter((c) => !c.xero_tenant_id)
-      .map((c) => '<option value="' + esc(c.id) + '">' + esc(c.short_name) + "</option>")
-      .join("");
+    const unlinked=res.unlinked_orgs||[];
+    const awaiting=(res.companies||[]).filter((c)=>!c.xero_tenant_id);
+    const options=(res.companies||[]).filter((c)=>!c.xero_tenant_id)
+      .map((c)=>'<option value="'+esc(c.id)+'">'+esc(c.short_name)+"</option>").join("");
 
-    let html = '<p class="sub" style="margin:0 0 4px">Connected' +
-      (res.connected_at ? " on " + esc(fmtDate(res.connected_at)) : "") + ". " +
-      (res.orgs || []).length + " organisation" + ((res.orgs || []).length === 1 ? "" : "s") + " visible.</p>";
+    let html='<p class="sub">Connected'+(res.connected_at?" on "+esc(fmtDate(res.connected_at)):"")+". "+
+      (res.orgs||[]).length+" organisation"+((res.orgs||[]).length===1?"":"s")+" visible.</p>";
 
-    const awaiting = (res.companies || []).filter((c) => !c.xero_tenant_id);
-    if (!unlinked.length) {
-      html += '<p class="empty">Every visible organisation is linked to a company.</p>';
-    } else {
-      html += unlinked.map((o) => {
-        const preselect = o.suggested ? o.suggested.company_id : "";
-        const opts = companyOptions.replace('value="' + esc(preselect) + '"', 'value="' + esc(preselect) + '" selected');
-        const note = o.suggested
-          ? '<span class="pill mute">suggested: ' + esc(o.suggested.short_name) + "</span>"
-          : '<span class="pill mute">no confident match</span>';
-        return '<div class="link-row" data-tenant="' + esc(o.tenant_id) + '">' +
-          '<span class="orgn">' + esc(o.tenant_name) + "</span>" + note +
-          '<select class="co-select">' + '<option value="">Choose company…</option>' + opts + "</select>" +
-          '<button class="btn btn-sm link-btn">Link</button>' +
-        "</div>";
-      }).join("");
-    }
-    // Name the companies still waiting, so it's obvious how many more passes are needed
-    // rather than leaving the reader to diff two lists by eye.
-    html += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--rule-soft)">';
-    if (awaiting.length) {
-      html += '<p class="sub" style="margin:0 0 10px">Still without a Xero organisation: ' +
-        awaiting.map((c) => esc(c.short_name)).join(", ") +
-        ". Xero grants one organisation per authorisation, so run this once more for each.</p>";
-    } else {
-      html += '<p class="sub" style="margin:0 0 10px">Every company has a Xero organisation linked.</p>';
-    }
-    html += connectBtn(awaiting.length ? "Connect another organisation" : "Connect another organisation (optional)");
-    html += "</div>";
+    if(!unlinked.length) html+='<p class="empty">Every visible organisation is linked to a company.</p>';
+    else html+=unlinked.map((o)=>{
+      const pre=o.suggested?o.suggested.company_id:"";
+      const opts=options.replace('value="'+esc(pre)+'"','value="'+esc(pre)+'" selected');
+      return '<div class="row" data-tenant="'+esc(o.tenant_id)+'" style="padding:10px 0;border-bottom:1px solid var(--rule-soft)">'+
+        '<span class="grow"><strong>'+esc(o.tenant_name)+"</strong></span>"+
+        (o.suggested?'<span class="pill mute">suggested: '+esc(o.suggested.short_name)+"</span>":'<span class="pill mute">no confident match</span>')+
+        '<select class="co-select" style="width:auto"><option value="">Choose company…</option>'+opts+"</select>"+
+        '<button class="btn btn-sm link-btn">Link</button></div>';
+    }).join("");
 
-    panel.innerHTML = html;
+    html+='<div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--rule-soft)">'+
+      (awaiting.length
+        ? '<p class="sub">Still without a Xero organisation: '+awaiting.map((c)=>esc(c.short_name)).join(", ")+
+          ". Xero grants one organisation per authorisation, so run this once more for each.</p>"
+        : '<p class="sub">Every company has a Xero organisation linked.</p>')+
+      connectBtn("Connect another organisation")+"</div>";
+
+    panel.innerHTML=html;
     wireConnect();
-
-    panel.querySelectorAll(".link-btn").forEach((btn) => {
-      btn.addEventListener("click", async () => {
-        const row = btn.closest(".link-row");
-        const companyId = row.querySelector(".co-select").value;
-        if (!companyId) return alert("Choose which company this organisation belongs to.");
-        btn.disabled = true; btn.textContent = "Linking…";
-        const r = await API.call("xero_link_company", { company_id: companyId, tenant_id: row.dataset.tenant });
-        if (!r.ok) { btn.disabled = false; btn.textContent = "Link"; return alert("Couldn't link: " + r.error); }
-        await renderCompanies();
-        await renderXero();
-      });
+    panel.querySelectorAll(".link-btn").forEach((btn)=>{
+      btn.onclick=async ()=>{
+        const row=btn.closest(".row");
+        const companyId=row.querySelector(".co-select").value;
+        if(!companyId) return alert("Choose which company this organisation belongs to.");
+        btn.disabled=true; btn.textContent="Linking…";
+        const r=await API.call("xero_link_company",{ company_id:companyId, tenant_id:row.dataset.tenant });
+        if(!r.ok){ btn.disabled=false; btn.textContent="Link"; return alert("Couldn't link: "+r.error); }
+        toast("Linked"); await enterApp();
+      };
     });
   }
 
   function fmtDate(iso){
-    try { return new Date(iso).toLocaleDateString("en-MY", { day: "numeric", month: "short", year: "numeric" }); }
-    catch (_e) { return iso; }
+    try { return new Date(iso).toLocaleDateString("en-MY",{day:"numeric",month:"short",year:"numeric"}); }
+    catch(_e){ return iso; }
   }
 
-  // ---- boot ----
+  // ═══════════ boot ═══════════
   (async function(){
     const user = API.getToken() ? await AUTH.currentUser() : null;
     if (user) return enterApp();
-
-    // Nobody signed in: show setup instead of sign-in if this portal has no accounts yet.
-    const status = await API.call("setup_status", { token: undefined });
-    if (status && status.ok && status.needs_setup) {
-      $("pwForm").classList.add("hide");
-      $("setupForm").classList.remove("hide");
-      $("signinTitle").textContent = "Set up the portal";
-      $("app").classList.add("hide");
-      $("signin").classList.remove("hide");
+    const status = await API.call("setup_status",{ token:undefined });
+    if (status && status.ok && status.needs_setup){
+      $("pwForm").classList.add("hide"); $("setupForm").classList.remove("hide");
+      $("signinTitle").textContent="Set up the portal";
+      $("app").classList.add("hide"); $("signin").classList.remove("hide");
       return;
     }
     showSignIn();
