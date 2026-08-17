@@ -340,6 +340,7 @@
     { key:"people",   label:"Employees", feature:"payroll" },
     { key:"o2o",      label:"O2O Invoicing", feature:"o2o" },
     { key:"gateway",  label:"Gateway Fees", feature:"gateway_fees" },
+    { key:"ap",       label:"Supplier Invoices", feature:"ap" },
     { key:"settings", label:"Settings" },
   ];
 
@@ -387,6 +388,7 @@
     if (TAB==="people")   return renderPeople(v);
     if (TAB==="o2o")      return renderO2O(v);
     if (TAB==="gateway")  return renderGateway(v);
+    if (TAB==="ap")       return renderAP(v);
     if (TAB==="settings") return renderSettings(v);
   }
 
@@ -1322,6 +1324,286 @@
     document.body.appendChild(bg);
     bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
     bg.querySelector("#gwOk").onclick=function(){ bg.remove(); };
+  }
+
+
+  // ═══════════ supplier invoices (AP) ═══════════
+  var AP_DOC = null, AP_FILTER = "needs_review";
+
+  async function renderAP(v){
+    if (AP_DOC) return renderAPDoc(v, AP_DOC);
+    var filters=[["needs_review","Needs review"],["ready_to_post","Ready to post"],
+                 ["posted","Posted"],["duplicate","Duplicates"],["rejected","Rejected"],["","All"]];
+    v.innerHTML=
+      '<div class="row" style="margin-bottom:16px"><div class="grow">'+
+      '<h2>Supplier invoices</h2><p class="sub" style="margin:0">'+
+      'Every bill stops here for a person. Nothing is ever approved for payment automatically.</p></div>'+
+      '<button class="btn btn-sm" id="apAdd">Add invoice</button></div>'+
+      '<div class="row" style="margin-bottom:14px">'+filters.map(function(f){
+        return '<button class="btn btn-sm '+(AP_FILTER===f[0]?"":"btn-ghost")+'" data-f="'+f[0]+'">'+f[1]+"</button>";
+      }).join("")+"</div>"+
+      '<div id="apList"><p class="empty">Loading…</p></div>';
+    $("apAdd").onclick=apAddModal;
+    v.querySelectorAll("button[data-f]").forEach(function(b){
+      b.onclick=function(){ AP_FILTER=b.dataset.f; render(); };
+    });
+
+    var params={}; if(ACTIVE) params.company_id=ACTIVE.id;
+    if(AP_FILTER) params.decision=AP_FILTER;
+    var res=await API.call("ap_list", params);
+    var box=$("apList");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    if(!res.documents.length){
+      box.innerHTML='<div class="panel"><p class="empty">Nothing here. Add a supplier invoice to start.</p></div>'; return;
+    }
+    box.innerHTML='<div class="tbl-wrap"><table><thead><tr><th>Supplier</th><th>Invoice</th>'+
+      '<th>Date</th><th class="num">Total</th><th>State</th><th></th></tr></thead><tbody>'+
+      res.documents.map(function(d){
+        var blockers=(d.decision_reasons||[]).filter(function(r){return r.severity==="block";});
+        return "<tr><td class='name'>"+esc(d.vendor_name||"—")+
+          (d.file_name?'<div style="font-size:11px;color:var(--ink-faint);font-weight:400">'+esc(d.file_name)+"</div>":"")+"</td>"+
+          "<td class='mono'>"+esc(d.invoice_number||"—")+"</td>"+
+          "<td>"+esc(d.invoice_date||"—")+"</td>"+
+          "<td class='num'>"+(d.total_sen!=null?rm(d.total_sen):"—")+"</td>"+
+          "<td>"+apPill(d.decision, blockers.length)+"</td>"+
+          "<td><button class='link' data-d='"+esc(d.id)+"'>Open</button></td></tr>";
+      }).join("")+"</tbody></table></div>";
+    box.querySelectorAll("button.link").forEach(function(b){
+      b.onclick=function(){ AP_DOC=b.dataset.d; render(); };
+    });
+  }
+
+  function apPill(decision, blockerCount){
+    if(decision==="posted")        return '<span class="pill good">in Xero</span>';
+    if(decision==="ready_to_post") return '<span class="pill warn">ready</span>';
+    if(decision==="duplicate")     return '<span class="pill mute">duplicate</span>';
+    if(decision==="rejected")      return '<span class="pill mute">rejected</span>';
+    if(decision==="company_unknown") return '<span class="pill bad">no company</span>';
+    return '<span class="pill bad">'+(blockerCount||0)+" to fix</span>";
+  }
+
+  async function renderAPDoc(v, docId){
+    v.innerHTML='<button class="link" id="apBack">← All supplier invoices</button>'+
+      '<div id="apBody" style="margin-top:12px"><p class="empty">Loading…</p></div>';
+    $("apBack").onclick=function(){ AP_DOC=null; render(); };
+
+    var res=await API.call("ap_get",{ document_id:docId });
+    var box=$("apBody");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    var d=res.document, lines=res.lines;
+    var blockers=(d.decision_reasons||[]).filter(function(r){return r.severity==="block";});
+    var warns=(d.decision_reasons||[]).filter(function(r){return r.severity==="warn";});
+
+    var html='<div class="row" style="margin-bottom:14px"><div class="grow">'+
+      "<h2>"+esc(d.vendor_name||"Unknown supplier")+"</h2>"+
+      '<p class="sub" style="margin:0">'+esc(d.invoice_number||"no invoice number")+
+      (d.file_name?" · "+esc(d.file_name):"")+"</p></div>"+apPill(d.decision,blockers.length)+"</div>";
+
+    if(d.decision==="posted"){
+      html+='<div class="msg ok"><strong>In Xero as '+esc(d.xero_invoice_number||"a bill")+'.</strong> '+
+        'It was created awaiting approval — it is not approved for payment until someone approves it in Xero.</div>';
+    }
+
+    // Blockers first and in plain words: this is the whole point of the screen.
+    if(blockers.length){
+      html+='<div class="msg err"><strong>Cannot post until these are resolved:</strong>'+
+        '<ul style="margin:8px 0 0;padding-left:20px">'+
+        blockers.map(function(r){ return "<li>"+esc(r.detail)+"</li>"; }).join("")+"</ul></div>";
+    }
+    if(warns.length){
+      html+='<div class="msg warn"><strong>Worth checking:</strong>'+
+        '<ul style="margin:8px 0 0;padding-left:20px">'+
+        warns.map(function(r){ return "<li>"+esc(r.detail)+"</li>"; }).join("")+"</ul></div>";
+    }
+
+    html+='<div class="panel"><div class="fields">'+
+      apField("Supplier","f_vendor",d.vendor_name)+
+      apField("Invoice number","f_invno",d.invoice_number)+
+      apField("Invoice date","f_invdate",d.invoice_date,"date")+
+      apField("Due date","f_due",d.due_date,"date")+
+      apField("Subtotal (RM)","f_sub",d.subtotal_sen!=null?(d.subtotal_sen/100).toFixed(2):"")+
+      apField("Tax (RM)","f_tax",d.tax_sen!=null?(d.tax_sen/100).toFixed(2):"")+
+      apField("Total (RM)","f_total",d.total_sen!=null?(d.total_sen/100).toFixed(2):"")+
+      '<div><label>Company</label><select id="f_company">'+
+        '<option value="">Not chosen</option>'+
+        COMPANIES.map(function(c){
+          return '<option value="'+esc(c.id)+'"'+(d.company_id===c.id?" selected":"")+">"+esc(c.short_name)+"</option>";
+        }).join("")+"</select></div>"+
+      "</div></div>";
+
+    html+='<h2 style="font-size:16px;margin:20px 0 4px">Lines</h2>'+
+      '<p class="sub">Each line needs an account code. Where one was chosen for you, the reason is shown.</p>'+
+      '<div class="tbl-wrap"><table><thead><tr><th>Description</th><th class="num">Amount</th>'+
+      '<th>Account</th><th>Why</th></tr></thead><tbody>'+
+      lines.map(function(l){
+        return "<tr data-line='"+l.line_no+"'>"+
+          "<td class='name'>"+esc(l.description||"—")+"</td>"+
+          "<td class='num'>"+rm(l.amount_sen)+"</td>"+
+          "<td><input class='ap-acct mono' style='width:110px;padding:5px 8px' value='"+esc(l.account_code||"")+"'></td>"+
+          "<td style='font-size:12px;color:var(--ink-faint)'>"+esc(l.coding_note||"")+"</td></tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td>Lines total</td><td class='num'>"+
+      rm(lines.reduce(function(s,l){return s+Number(l.amount_sen);},0))+"</td><td colspan='2'></td></tr></tfoot></table></div>";
+
+    if(d.decision!=="posted"){
+      html+='<div class="row" style="margin-top:16px">'+
+        '<button class="btn btn-sm btn-ghost" id="apSave">Save changes</button>'+
+        (d.decision==="ready_to_post"?'<button class="btn btn-sm" id="apPreview">Preview the Xero bill</button>'+
+          '<button class="btn btn-sm" id="apPost">Post to Xero</button>':"")+
+        '<span class="grow"></span>'+
+        '<button class="btn btn-sm btn-danger" id="apRejectBtn">Reject</button></div>';
+    }
+
+    box.innerHTML=html;
+
+    var sv=$("apSave");
+    if(sv) sv.onclick=async function(){
+      sv.disabled=true; sv.textContent="Saving…";
+      var payload={ document_id:docId,
+        vendor_name:$("f_vendor").value.trim(),
+        invoice_number:$("f_invno").value.trim(),
+        invoice_date:$("f_invdate").value||null,
+        due_date:$("f_due").value||null,
+        subtotal_sen:senFromInput($("f_sub").value),
+        tax_sen:senFromInput($("f_tax").value),
+        total_sen:senFromInput($("f_total").value),
+        lines:[].slice.call(box.querySelectorAll("tr[data-line]")).map(function(tr){
+          return { line_no:parseInt(tr.dataset.line,10), account_code:tr.querySelector(".ap-acct").value.trim() };
+        }),
+      };
+      var comp=$("f_company").value; if(comp) payload.company_id=comp;
+      var r=await API.call("ap_update",payload);
+      sv.disabled=false; sv.textContent="Save changes";
+      if(!r.ok) return alert(r.error);
+      toast(r.decision==="ready_to_post"?"Saved — ready to post":"Saved");
+      renderAPDoc($("view"),docId);
+    };
+
+    var pv=$("apPreview");
+    if(pv) pv.onclick=async function(){
+      var r=await API.call("ap_post_preview",{ document_id:docId });
+      if(!r.ok) return alert(r.error);
+      apPreviewModal(r);
+    };
+
+    var pb=$("apPost");
+    if(pb) pb.onclick=function(){ apConfirmPost(docId, d); };
+
+    var rj=$("apRejectBtn");
+    if(rj) rj.onclick=async function(){
+      var why=prompt("Why is this being rejected? (kept on the record)");
+      if(why===null) return;
+      var r=await API.call("ap_reject",{ document_id:docId, reason:why });
+      if(!r.ok) return alert(r.error);
+      toast("Rejected"); AP_DOC=null; render();
+    };
+  }
+
+  function apField(label,id,value,type){
+    return '<div><label>'+esc(label)+'</label><input id="'+id+'" type="'+(type||"text")+'" value="'+esc(value==null?"":value)+'"></div>';
+  }
+
+  function apPreviewModal(r){
+    var p=r.payload;
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal"><h3>The bill that will be created</h3>'+
+      '<p class="sub">In '+esc(r.company)+". Nothing has been sent yet.</p>"+
+      '<div class="panel" style="margin-bottom:12px"><div class="row"><span class="grow">Supplier</span><strong>'+esc(p.Contact.Name)+"</strong></div>"+
+      '<div class="row"><span class="grow">Invoice number</span><strong class="mono">'+esc(p.InvoiceNumber||"—")+"</strong></div>"+
+      '<div class="row"><span class="grow">Date / due</span><strong>'+esc(p.Date)+" → "+esc(p.DueDate)+"</strong></div>"+
+      '<div class="row"><span class="grow">Currency</span><strong>'+esc(p.CurrencyCode)+"</strong></div></div>"+
+      '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Description</th>'+
+      '<th class="num">Qty</th><th class="num">Unit</th><th>Account</th></tr></thead><tbody>'+
+      p.LineItems.map(function(li){
+        return "<tr><td>"+esc(li.Description)+"</td><td class='num'>"+li.Quantity+"</td>"+
+          "<td class='num'>"+li.UnitAmount.toFixed(2)+"</td><td class='mono'>"+esc(li.AccountCode||"—")+"</td></tr>";
+      }).join("")+"</tbody></table></div>"+
+      (r.warnings&&r.warnings.length?'<div class="msg warn" style="margin-top:12px">'+
+        r.warnings.map(function(w){return esc(w.detail);}).join("<br>")+"</div>":"")+
+      '<div class="modal-actions"><button class="btn btn-sm" id="apPvClose">Close</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#apPvClose").onclick=function(){ bg.remove(); };
+  }
+
+  function apConfirmPost(docId, d){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:460px"><h3>Post this bill to Xero?</h3>'+
+      '<div class="panel" style="margin:0 0 12px"><div class="row"><span class="grow">Supplier</span><strong>'+esc(d.vendor_name)+"</strong></div>"+
+      '<div class="row"><span class="grow">Invoice</span><strong class="mono">'+esc(d.invoice_number)+"</strong></div>"+
+      '<div class="row"><span class="grow">Total</span><strong>'+rm(d.total_sen)+"</strong></div></div>"+
+      '<p class="sub">It will be created <strong>awaiting approval</strong> — visible in Xero as a bill, '+
+      "but not approved for payment. Someone still has to approve it there before any money moves.</p>"+
+      '<div id="apPostMsg" class="msg err hide"></div>'+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="apPcancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="apPgo">Post to Xero</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#apPcancel").onclick=function(){ bg.remove(); };
+    bg.querySelector("#apPgo").onclick=async function(){
+      var btn=bg.querySelector("#apPgo"); btn.disabled=true; btn.textContent="Posting…";
+      var r=await API.call("ap_post",{ document_id:docId });
+      btn.disabled=false; btn.textContent="Post to Xero";
+      if(!r.ok){ var m=bg.querySelector("#apPostMsg"); m.textContent=r.error; m.classList.remove("hide"); return; }
+      bg.remove(); toast("Posted as "+(r.xero_invoice_number||"a bill")+" — awaiting approval in Xero");
+      renderAPDoc($("view"),docId);
+    };
+  }
+
+  // Manual entry. Extraction from a PDF is a later step; this exists so the review and
+  // posting path is usable and provable today rather than blocked behind it.
+  function apAddModal(){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal"><h3>Add a supplier invoice</h3>'+
+      '<div id="apAddMsg" class="msg err hide"></div>'+
+      '<div class="fields">'+
+        '<div><label>Company</label><select id="a_company">'+COMPANIES.map(function(c){
+          return '<option value="'+esc(c.id)+'"'+(ACTIVE&&c.id===ACTIVE.id?" selected":"")+">"+esc(c.short_name)+"</option>";
+        }).join("")+"</select></div>"+
+        '<div><label>Supplier</label><input id="a_vendor"></div>'+
+        '<div><label>Invoice number</label><input id="a_invno"></div>'+
+        '<div><label>Invoice date</label><input id="a_date" type="date"></div>'+
+        '<div><label>Due date</label><input id="a_due" type="date"></div>'+
+        '<div><label>Subtotal (RM)</label><input id="a_sub" class="mono" inputmode="decimal"></div>'+
+        '<div><label>Tax (RM)</label><input id="a_tax" class="mono" inputmode="decimal"></div>'+
+        '<div><label>Total (RM)</label><input id="a_total" class="mono" inputmode="decimal"></div>'+
+        '<div class="full"><label>Description</label><input id="a_desc" placeholder="what this bill is for"></div>'+
+        '<div><label>Account code</label><input id="a_acct" class="mono" placeholder="e.g. 400"></div>'+
+      "</div>"+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="aCancel">Cancel</button>'+
+      '<button class="btn btn-sm" id="aGo">Add</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#aCancel").onclick=function(){ bg.remove(); };
+    bg.querySelector("#aGo").onclick=async function(){
+      var btn=bg.querySelector("#aGo"); btn.disabled=true; btn.textContent="Adding…";
+      var total=senFromInput(bg.querySelector("#a_total").value);
+      var sub=senFromInput(bg.querySelector("#a_sub").value);
+      var res=await API.call("ap_intake",{
+        company_id: bg.querySelector("#a_company").value || null,
+        file_name: "entered by hand",
+        extraction:{
+          vendor_name: bg.querySelector("#a_vendor").value.trim(),
+          invoice_number: bg.querySelector("#a_invno").value.trim(),
+          invoice_date: bg.querySelector("#a_date").value||null,
+          due_date: bg.querySelector("#a_due").value||null,
+          currency:"MYR",
+          subtotal_sen: sub||null,
+          tax_sen: senFromInput(bg.querySelector("#a_tax").value)||null,
+          total_sen: total||null,
+          document_type:"invoice",
+          lines:[{ description: bg.querySelector("#a_desc").value.trim()||"Supplier charge",
+                   quantity:1, amount_sen: sub||total,
+                   account_code: bg.querySelector("#a_acct").value.trim()||null }],
+        },
+        extraction_model:"manual", confidence:"high",
+      });
+      btn.disabled=false; btn.textContent="Add";
+      if(!res.ok){ var m=bg.querySelector("#apAddMsg"); m.textContent=res.error; m.classList.remove("hide"); return; }
+      bg.remove();
+      toast(res.decision==="ready_to_post"?"Added — ready to post":"Added — needs review");
+      AP_DOC=res.document_id; AP_FILTER=""; render();
+    };
   }
 
   // ═══════════ settings ═══════════
