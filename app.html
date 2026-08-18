@@ -345,9 +345,15 @@
     .grid{grid-template-columns:1fr}
 
     /* Header: the company picker is the thing people reach for, so it gets the room. */
-    .bar{padding:10px 12px;gap:9px;flex-wrap:wrap}
+    .bar{padding:10px 12px;gap:9px}
     .bar .who{display:none}
+    /* The product name is redundant once you are inside the app, and on a 390px bar it was
+       squeezing the company picker down to "CTG⌄" -- which is the one control people actually
+       reach for. The monogram still identifies the page. */
+    .bar .name{display:none}
     .bar select{flex:1;min-width:0}
+    /* Sign out becomes a compact control so the picker keeps the width. */
+    .bar .btn{padding:9px 12px;font-size:13px;flex:0 0 auto}
     nav.tabs{padding:0 12px;gap:0;-webkit-overflow-scrolling:touch;scrollbar-width:none}
     nav.tabs::-webkit-scrollbar{display:none}
     nav.tabs button{padding:11px 12px;font-size:13.5px}
@@ -373,6 +379,19 @@
        a row. */
     .cards-on-phone td[data-label="Shape"],
     .cards-on-phone td[data-label="Share"]{display:none}
+    /* Cells whose content is a set of tags stack instead of sharing a line. A pill like
+       "MasterNerv (Internal) 50%" is ~150px and does not shrink, so in a flex row two of them
+       pushed the People page 797px wide on a 390px screen. Block layout lets them wrap. */
+    .cards-on-phone td[data-label="Projects"],
+    .cards-on-phone td[data-label="Companies"],
+    .cards-on-phone td[data-label="Why"],
+    .cards-on-phone td[data-label="Email"]{display:block}
+    .cards-on-phone td[data-label="Projects"]::before,
+    .cards-on-phone td[data-label="Companies"]::before,
+    .cards-on-phone td[data-label="Why"]::before,
+    .cards-on-phone td[data-label="Email"]::before{display:block;margin-bottom:5px}
+    /* A single tag longer than the screen wraps rather than overflowing. */
+    .cards-on-phone .pill{white-space:normal;max-width:100%}
     /* The name leads the card as a heading rather than as another labelled row. */
     .cards-on-phone td.name{display:block;font-size:15.5px;font-weight:700;color:var(--ink);
       margin:0 0 8px;padding-bottom:8px;border-bottom:1px solid var(--rule-soft)}
@@ -613,7 +632,7 @@
     { key:"o2o",      label:"O2O Invoicing", feature:"o2o" },
     { key:"gateway",  label:"Gateway Fees", feature:"gateway_fees" },
     { key:"ap",       label:"Supplier Invoices", feature:"ap" },
-    { key:"users",    label:"People &amp; access", manage:true },
+    { key:"users",    label:"People & access", manage:true },
     { key:"settings", label:"Settings" },
   ];
 
@@ -903,23 +922,37 @@
     return income ? "margin "+marginPct(t) : "no income recorded";
   }
 
-  /** Ageing as a row of bars on a shared scale, because "how bad is the tail" is a shape
-   *  question and a table of five numbers does not answer it at a glance. */
+  /** Ageing as HORIZONTAL bars, one row per bucket.
+   *
+   *  This was a five-column vertical chart, and it was the single thing that made the whole
+   *  dashboard scroll sideways on a phone. Each column carried an amount label like
+   *  "RM 3,560,582" set nowrap at about 90px, so five of them needed 450px of width no matter
+   *  how narrow the screen was. Measured at true device widths it overflowed on a Galaxy S22
+   *  (360), an iPhone 14 (390) and a Pro Max (430) alike.
+   *
+   *  Rows fix it structurally rather than by shrinking type: the label and amount share a line
+   *  that wraps, and the bar is a percentage width, so there is no arrangement of numbers that
+   *  can push past the edge. It also reads better on a wide screen, because named categories
+   *  compare more easily down a column than across one. */
   function ageingBars(buckets, ageing, total){
     var max=Math.max.apply(null,buckets.map(function(b){return Math.abs(ageing[b.key]||0);}))||1;
-    // Current is calm; the further overdue, the hotter — amber then vermilion.
+    // Calm for current, hotter the further overdue.
     var colour=["var(--ctg-blue)","var(--ctg-blue-lt)","var(--ctg-amber)","var(--ctg-amber-lt)","var(--ctg-verm)"];
-    return '<div style="display:grid;grid-template-columns:repeat('+buckets.length+
-      ',1fr);gap:8px;align-items:end;min-height:96px">'+
+    return '<div style="display:grid;gap:11px">'+
       buckets.map(function(b,i){
-        var v=ageing[b.key]||0, h=Math.max(3,Math.round(Math.abs(v)/max*76));
+        var v=ageing[b.key]||0, w=Math.max(1.5,Math.abs(v)/max*100);
         var share=total?Math.round(v/total*100):0;
-        return '<div style="text-align:center">'+
-          '<div class="num" style="font-size:12.5px;font-weight:700;margin-bottom:5px;white-space:nowrap">'+rm0(v)+"</div>"+
-          '<div style="height:'+h+'px;border-radius:6px 6px 0 0;background:'+colour[i%colour.length]+'"></div>'+
-          '<div style="font-size:10.5px;color:var(--ink-faint);margin-top:6px;font-weight:600">'+esc(b.label)+"</div>"+
-          '<div style="font-size:10px;color:var(--ink-faint)">'+share+"%</div>"+
-          "</div>";
+        return '<div>'+
+          '<div style="display:flex;justify-content:space-between;align-items:baseline;gap:10px;'+
+          'margin-bottom:5px;flex-wrap:wrap">'+
+            '<span style="font-size:12.5px;font-weight:700;color:var(--ink-soft)">'+esc(b.label)+
+              ' <span style="color:var(--ink-faint);font-weight:600">'+share+'%</span></span>'+
+            '<span class="num" style="font-size:13.5px;font-weight:700">'+rm0(v)+'</span>'+
+          '</div>'+
+          '<div style="height:9px;border-radius:5px;background:var(--sunken);overflow:hidden">'+
+            '<div style="height:100%;width:'+w+'%;border-radius:5px;background:'+colour[i%colour.length]+'"></div>'+
+          '</div>'+
+        '</div>';
       }).join("")+"</div>";
   }
 
@@ -1313,14 +1346,14 @@
     // Each component named and totalled, so what made up the month is legible at a glance.
     if(L.length){
       html+='<div class="panel"><h3 style="margin:0 0 10px">What made up gross pay</h3>'+
-        '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Component</th>'+
+        '<div class="tbl-wrap cards-on-phone" style="box-shadow:none"><table><thead><tr><th>Component</th>'+
         '<th class="num">Total</th><th class="num">People</th></tr></thead><tbody>'+
-        '<tr><td class="name">Basic salary</td><td class="num">'+rm(t.basic_sen)+'</td>'+
-        '<td class="num">'+t.headcount+'</td></tr>'+
+        '<tr><td class="name">Basic salary</td><td class="num" data-label="Total">'+rm(t.basic_sen)+'</td>'+
+        '<td class="num" data-label="People">'+t.headcount+'</td></tr>'+
         L.map(function(lab,i){
           var n=res.rows.filter(function(r){return r.components[i]!==0;}).length;
-          return '<tr><td class="name">'+esc(lab)+'</td><td class="num">'+rm(CT[i])+'</td>'+
-                 '<td class="num">'+n+'</td></tr>';
+          return '<tr><td class="name">'+esc(lab)+'</td><td class="num" data-label="Total">'+rm(CT[i])+'</td>'+
+                 '<td class="num" data-label="People">'+n+'</td></tr>';
         }).join("")+
         '</tbody><tfoot><tr><td>Gross pay</td><td class="num">'+rm(t.gross_sen)+'</td><td></td></tr></tfoot>'+
         "</table></div></div>";
@@ -1328,20 +1361,24 @@
 
     // Statutory, laid out the way it is actually remitted.
     html+='<div class="panel"><h3 style="margin:0 0 10px">Statutory</h3>'+
-      '<div class="tbl-wrap" style="box-shadow:none"><table><thead><tr><th>Body</th>'+
+      '<div class="tbl-wrap cards-on-phone" style="box-shadow:none"><table><thead><tr><th>Body</th>'+
       '<th class="num">Employee</th><th class="num">Employer</th><th class="num">Total</th>'+
       '</tr></thead><tbody>'+
       [["EPF (KWSP)", "epf"],["SOCSO + SKBBK (PERKESO)","socso"],["EIS (PERKESO)","eis"]]
         .map(function(p){
           var ee=res.rows.reduce(function(a,r){return a+r[p[1]+"_ee_sen"]+(p[1]==="socso"?r.skbbk_ee_sen:0);},0);
           var er=res.rows.reduce(function(a,r){return a+r[p[1]+"_er_sen"];},0);
-          return "<tr><td class='name'>"+p[0]+"</td><td class='num'>"+rm(ee)+"</td><td class='num'>"+
-                 rm(er)+"</td><td class='num'>"+rm(ee+er)+"</td></tr>";
+          return "<tr><td class='name'>"+p[0]+"</td>"+
+                 "<td class='num' data-label='Employee'>"+rm(ee)+"</td>"+
+                 "<td class='num' data-label='Employer'>"+rm(er)+"</td>"+
+                 "<td class='num' data-label='Total'>"+rm(ee+er)+"</td></tr>";
         }).join("")+
-      "<tr><td class='name'>PCB (LHDN)</td><td class='num'>"+rm(t.pcb_sen)+"</td><td class='num'>—</td>"+
-      "<td class='num'>"+rm(t.pcb_sen)+"</td></tr>"+
-      "<tr><td class='name'>HRD Corp levy</td><td class='num'>—</td><td class='num'>"+rm(t.hrdf_sen)+
-      "</td><td class='num'>"+rm(t.hrdf_sen)+"</td></tr>"+
+      "<tr><td class='name'>PCB (LHDN)</td><td class='num' data-label='Employee'>"+rm(t.pcb_sen)+
+      "</td><td class='num' data-label='Employer'>—</td>"+
+      "<td class='num' data-label='Total'>"+rm(t.pcb_sen)+"</td></tr>"+
+      "<tr><td class='name'>HRD Corp levy</td><td class='num' data-label='Employee'>—</td>"+
+      "<td class='num' data-label='Employer'>"+rm(t.hrdf_sen)+
+      "</td><td class='num' data-label='Total'>"+rm(t.hrdf_sen)+"</td></tr>"+
       "</tbody><tfoot><tr><td>Statutory</td><td class='num'></td><td class='num'></td>"+
       "<td class='num'>"+rm(t.epf_sen+t.socso_sen+t.eis_sen+t.pcb_sen+t.hrdf_sen)+"</td></tr></tfoot>"+
       "</table></div>"+
@@ -1350,7 +1387,7 @@
       'line above is what leaves the bank: <strong>'+rm(t.bank_total_sen)+'</strong>.</p></div>';
 
     // Per person, one column per component.
-    html+='<div class="tbl-wrap"><table><thead><tr><th>No.</th><th>Name</th>'+
+    html+='<div class="tbl-wrap cards-on-phone"><table><thead><tr><th>No.</th><th>Name</th>'+
       '<th class="num">Basic</th>'+L.map(function(lab){
         // Header shows the component's short name; the full label, brackets and all, is the
         // tooltip. Trailing punctuation is stripped because "Incentive. ( OKR )" otherwise
@@ -1363,15 +1400,19 @@
       '</tr></thead><tbody>'+
       res.rows.map(function(r){
         return "<tr"+(r.variances.length?' class="warn-row"':"")+">"+
-          "<td>"+esc(r.emp_no||"—")+"</td>"+
+          "<td data-label='No.'>"+esc(r.emp_no||"—")+"</td>"+
           "<td class='name'>"+esc(r.name)+(nickWorthShowing(r.name,r.nickname)
             ?' <span class="sub">'+esc(r.nickname)+"</span>":"")+"</td>"+
-          "<td class='num'>"+rm(r.basic_sen)+"</td>"+
-          r.components.map(function(c){ return "<td class='num'>"+(c?rm(c):'<span style="color:var(--ink-faint)">—</span>')+"</td>"; }).join("")+
-          "<td class='num'>"+rm(r.gross_sen)+"</td>"+
-          "<td class='num'>"+rm(r.epf_ee_sen)+"</td><td class='num'>"+rm(r.socso_ee_sen+r.skbbk_ee_sen)+"</td>"+
-          "<td class='num'>"+rm(r.eis_ee_sen)+"</td><td class='num'>"+rm(r.pcb_sen)+"</td>"+
-          "<td class='num'><strong>"+rm(r.net_sen)+"</strong></td></tr>";
+          "<td class='num' data-label='Basic'>"+rm(r.basic_sen)+"</td>"+
+          r.components.map(function(c,ci){
+            return "<td class='num' data-label='"+esc(L[ci].split("(")[0].replace(/[.,;:\s]+$/,"").trim())+"'>"+
+              (c?rm(c):'<span style="color:var(--ink-faint)">—</span>')+"</td>"; }).join("")+
+          "<td class='num' data-label='Gross'>"+rm(r.gross_sen)+"</td>"+
+          "<td class='num' data-label='EPF'>"+rm(r.epf_ee_sen)+"</td>"+
+          "<td class='num' data-label='SOCSO'>"+rm(r.socso_ee_sen+r.skbbk_ee_sen)+"</td>"+
+          "<td class='num' data-label='EIS'>"+rm(r.eis_ee_sen)+"</td>"+
+          "<td class='num' data-label='PCB'>"+rm(r.pcb_sen)+"</td>"+
+          "<td class='num' data-label='Net pay'><strong>"+rm(r.net_sen)+"</strong></td></tr>";
       }).join("")+
       "</tbody><tfoot><tr><td></td><td>"+t.headcount+" employees</td><td class='num'>"+rm(t.basic_sen)+"</td>"+
       CT.map(function(c){ return "<td class='num'>"+rm(c)+"</td>"; }).join("")+
@@ -2002,13 +2043,14 @@
     if(res.redirects && res.redirects.length){
       html+='<div class="msg"><strong>'+res.redirects.length+' cost '+
         (res.redirects.length===1?"centre is":"centres are")+' recorded somewhere other than keyed.</strong>'+
-        '<div class="tbl-wrap" style="margin-top:10px;box-shadow:none"><table><thead><tr>'+
+        '<div class="tbl-wrap cards-on-phone" style="margin-top:10px;box-shadow:none"><table><thead><tr>'+
         '<th>Keyed to</th><th>Recorded as</th><th class="num">Head</th><th class="num">Moved</th><th>Why</th>'+
         '</tr></thead><tbody>'+res.redirects.map(function(r){
           return "<tr><td class='name'>"+esc(r.keyed_to)+'<div class="fld-note">'+esc(r.keyed_owner||"—")+"</div></td>"+
-            "<td class='name'>"+esc(r.recorded_as)+'<div class="fld-note">'+esc(r.recorded_owner||"—")+"</div></td>"+
-            "<td class='num'>"+r.headcount.toFixed(1)+"</td><td class='num'>"+rm(r.moved_sen)+"</td>"+
-            "<td style='white-space:normal;font-size:12px'>"+esc(r.reason||"")+"</td></tr>";
+            "<td data-label='Recorded as'>"+esc(r.recorded_as)+" ("+esc(r.recorded_owner||"—")+")</td>"+
+            "<td class='num' data-label='Head'>"+r.headcount.toFixed(1)+"</td>"+
+            "<td class='num' data-label='Moved'>"+rm(r.moved_sen)+"</td>"+
+            "<td data-label='Why' style='white-space:normal;font-size:12px'>"+esc(r.reason||"")+"</td></tr>";
         }).join("")+"</tbody></table></div></div>";
     }
 
