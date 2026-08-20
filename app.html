@@ -624,6 +624,7 @@
     { key:"overview", label:"Overview" },
     { key:"pnl",      label:"Profit & Loss", feature:"pnl" },
     { key:"brands",   label:"Brands", feature:"brands" },
+    { key:"ar",       label:"Receivables", feature:"ar" },
     { key:"payroll",  label:"Payroll",   feature:"payroll" },
     { key:"projects", label:"Project cost", feature:"payroll" },
     // The directory carries no pay, so it is not gated on a money feature. Gating it on
@@ -692,6 +693,7 @@
     if (TAB==="brands")   return renderBrands(v);
     if (TAB==="payroll")  return renderPayroll(v);
     if (TAB==="people")   return renderPeople(v);
+    if (TAB==="ar")       return renderAR(v);
     if (TAB==="brain")    return renderBrain(v);
     if (TAB==="users")    return renderUsers(v);
     if (TAB==="projects") return renderProjects(v);
@@ -2009,6 +2011,179 @@
       }).join("")+"</div>";
     }
     box.innerHTML=html;
+  }
+
+
+  // ── receivables ─────────────────────────────────────────────────────────────────────────
+
+  var AR_ALL = false;
+
+  /** A collections worklist. The dashboard already gives a total owed; a total answers "how
+   *  much" and not "who, how late, and what are we doing about it". */
+  async function renderAR(v){
+    v.innerHTML='<div class="masthead"><div class="row" style="align-items:flex-end"><div class="grow">'+
+      '<p class="eyebrow">CTG Wellness Group · Internal Finance</p>'+
+      '<h1>Receivables</h1><p class="sub" style="margin:0" id="arAsAt">Reading live from Xero…</p></div>'+
+      '<label class="check"><input type="checkbox" id="arAll"'+(AR_ALL?" checked":"")+'> Include not-chased</label>'+
+      '</div></div><div id="arBody"><p class="empty">Loading…</p></div>';
+    $("arAll").onchange=function(e){ AR_ALL=e.target.checked; renderAR(v); };
+
+    var res=await API.call("ar_list",{ company_id: ACTIVE?ACTIVE.id:undefined, include_not_chased:AR_ALL });
+    var box=$("arBody");
+    if(!res.ok){ box.innerHTML='<p class="empty">'+esc(AUTH.friendlyError(res.error))+"</p>"; return; }
+    $("arAsAt").textContent="Live from Xero, as at "+
+      new Date(res.as_at).toLocaleString("en-MY",{dateStyle:"medium",timeStyle:"short"});
+
+    var t=res.totals;
+    var html='<div class="tiles">'+
+      tile("Owed to us", rm0(t.owing_sen), t.invoices+" invoices", true)+
+      tile("Overdue", rm0(t.overdue_sen),
+           t.owing_sen?Math.round(t.overdue_sen/t.owing_sen*100)+"% of the book":"none")+
+      tile("Customers", String(t.customers), "with something outstanding")+
+      tile("Broken promises", String(res.broken_promises.length),
+           res.broken_promises.length?"promised and did not pay":"none outstanding")+
+      tile("90+ days", rm0(t.ageing.d90plus||0), "the hardest to collect")+
+      "</div>";
+
+    // Anything that would make the total wrong is said before the total is read.
+    if(res.truncated){
+      html+='<div class="msg err"><strong>Xero returned more invoices than could be read in one go.</strong> '+
+        'The figures above are understated. This is the same failure that once hid RM3.4M of '+
+        'receivables, so it is reported rather than shown as a total.</div>';
+    }
+    if(res.problems && res.problems.length){
+      html+='<div class="msg warn"><strong>Some companies could not be read.</strong> '+
+        res.problems.map(esc).join("; ")+". Their receivables are missing from the figures above.</div>";
+    }
+    if(res.not_chased && res.not_chased.length && !AR_ALL){
+      var q=res.not_chased.reduce(function(a,x){return a+x.owing_sen;},0);
+      html+='<div class="msg"><strong>'+res.not_chased.length+' customer(s) owing '+rm(q)+
+        ' are excluded from the worklist</strong> because they are marked not-to-chase. They still '+
+        'owe the money — tick “Include not-chased” to see them.</div>';
+    }
+    if(res.broken_promises.length){
+      html+='<div class="msg err"><strong>'+res.broken_promises.length+
+        ' customer(s) promised to pay and the date has passed.</strong> '+
+        res.broken_promises.map(function(p){
+          return esc(p.contact)+" — "+rm(p.amount_sen||p.owing_sen)+" by "+esc(p.promised_on);
+        }).join("; ")+". A promise broken twice is a different problem from being late.</div>";
+    }
+
+    html+='<div class="panel"><h3 style="margin:0 0 4px">The book by age</h3>'+
+      '<p class="sub" style="margin:0 0 12px">Oldest is hardest — the tail is what matters</p>'+
+      ageingBars(res.buckets, t.ageing, t.owing_sen)+"</div>";
+
+    if(!res.customers.length){
+      html+='<div class="panel"><p class="empty">Nothing outstanding.</p></div>';
+      box.innerHTML=html; return;
+    }
+
+    html+='<div class="tbl-wrap cards-on-phone"><table><thead><tr><th>Customer</th><th>Company</th>'+
+      '<th class="num">Owed</th><th class="num">Overdue</th><th class="num">Oldest</th>'+
+      '<th>State</th><th></th></tr></thead><tbody>'+
+      res.customers.map(function(c){
+        var state=c.disputed?'<span class="pill bad">disputed</span>'
+          : c.open_promise? (c.open_promise.overdue
+              ?'<span class="pill bad">promise broken</span>'
+              :'<span class="pill warn">promised '+esc(c.open_promise.promised_on)+"</span>")
+          : c.last_chased?'<span class="pill mute">chased '+esc(fmtDate(c.last_chased))+"</span>"
+          : c.overdue_sen?'<span class="pill warn">not chased</span>'
+          :'<span class="pill good"><span class="dot"></span>current</span>';
+        return "<tr><td class='name'>"+esc(c.contact_name)+
+            (c.settings&&c.settings.do_not_chase?' <span class="pill mute">not chased</span>':"")+"</td>"+
+          "<td data-label='Company'>"+esc(c.company)+"</td>"+
+          "<td class='num' data-label='Owed'>"+rm(c.owing_sen)+"</td>"+
+          "<td class='num' data-label='Overdue'>"+(c.overdue_sen
+            ?'<span style="color:var(--bad)">'+rm(c.overdue_sen)+"</span>":"—")+"</td>"+
+          "<td class='num' data-label='Oldest'>"+(c.oldest_days>0?c.oldest_days+"d":"—")+"</td>"+
+          "<td data-label='State'>"+state+"</td>"+
+          "<td><button class='link arOpen' data-k='"+esc(c.key)+"'>Open</button></td></tr>";
+      }).join("")+
+      "</tbody><tfoot><tr><td colspan='2'>"+t.customers+" customers</td>"+
+      "<td class='num' data-label='Owed'>"+rm(t.owing_sen)+"</td>"+
+      "<td class='num' data-label='Overdue'>"+rm(t.overdue_sen)+"</td>"+
+      "<td colspan='3'></td></tr></tfoot></table></div>";
+
+    box.innerHTML=html;
+    box.querySelectorAll("button.arOpen").forEach(function(btn){
+      btn.onclick=function(){
+        arCustomerModal(res.customers.find(function(c){return c.key===btn.dataset.k;}));
+      };
+    });
+  }
+
+  /** One customer: what they owe, invoice by invoice, and everything ever said to them. */
+  function arCustomerModal(c){
+    var bg=document.createElement("div"); bg.className="modal-bg";
+    bg.innerHTML='<div class="modal" style="max-width:820px"><h3>'+esc(c.contact_name)+"</h3>"+
+      '<p class="sub">'+esc(c.company)+" · "+rm(c.owing_sen)+" outstanding across "+
+      c.invoice_count+" invoice"+(c.invoice_count===1?"":"s")+"</p>"+
+      '<div id="arMsg" class="msg err hide"></div>'+
+      '<div class="tbl-wrap cards-on-phone" style="box-shadow:none;margin-bottom:14px"><table><thead><tr>'+
+      '<th>Invoice</th><th>Due</th><th class="num">Late</th><th class="num">Owing</th>'+
+      '</tr></thead><tbody>'+
+      c.invoices.map(function(i){
+        return "<tr><td class='name'>"+esc(i.number||"—")+
+            (i.reference?'<div class="fld-note">'+esc(i.reference)+"</div>":"")+"</td>"+
+          "<td data-label='Due'>"+esc(i.due_date||"—")+"</td>"+
+          "<td class='num' data-label='Late'>"+(i.days_late>0
+            ?'<span style="color:var(--bad)">'+i.days_late+"d</span>":"—")+"</td>"+
+          "<td class='num' data-label='Owing'>"+rm(i.owing_sen)+"</td></tr>";
+      }).join("")+"</tbody></table></div>"+
+
+      '<h3 style="font-size:14px;margin:0 0 8px">Record what happened</h3>'+
+      '<div class="fields">'+
+        '<div><label>What kind</label><select id="ar_kind">'+
+          '<option value="chase">Chased them</option>'+
+          '<option value="promise">They promised to pay</option>'+
+          '<option value="dispute">They dispute it</option>'+
+          '<option value="write_off_request">Ask to write off</option>'+
+          '<option value="note">Note</option></select></div>'+
+        '<div id="ar_promiseWrap" style="display:none"><label>Promised by</label>'+
+          '<input type="date" id="ar_when"></div>'+
+        '<div class="full"><label>What was said</label>'+
+          '<input id="ar_body" placeholder="e.g. spoke to Ms Tan, cheque posted Friday"></div>'+
+      "</div>"+
+
+      (c.notes&&c.notes.length
+        ? '<h3 style="font-size:14px;margin:16px 0 8px">History</h3><div style="display:grid;gap:8px">'+
+          c.notes.map(function(n){
+            return '<div style="border-left:2px solid var(--rule);padding-left:10px">'+
+              '<div style="font-size:13px">'+esc(n.body)+"</div>"+
+              '<div class="fld-note">'+esc(n.kind)+" · "+esc(n.created_by_name||"")+" · "+
+              esc(fmtDate(n.created_at))+
+              (n.promised_on?" · promised "+esc(n.promised_on)+
+                (n.promise_kept===true?" (kept)":n.promise_kept===false?" (broken)":" (open)"):"")+
+              "</div></div>";
+          }).join("")+"</div>"
+        : '<p class="fld-note" style="margin-top:14px">Nothing has been recorded for this customer yet.</p>')+
+
+      '<div class="modal-actions"><button class="btn btn-sm btn-ghost" id="arClose">Close</button>'+
+      '<button class="btn btn-sm" id="arSave">Record it</button></div></div>';
+    document.body.appendChild(bg);
+    bg.addEventListener("click",function(ev){ if(ev.target===bg) bg.remove(); });
+    bg.querySelector("#arClose").onclick=function(){ bg.remove(); };
+    bg.querySelector("#ar_kind").onchange=function(e){
+      // A promise without a date is a hope, so the field appears and is required.
+      bg.querySelector("#ar_promiseWrap").style.display = e.target.value==="promise" ? "" : "none";
+    };
+    bg.querySelector("#arSave").onclick=async function(){
+      var m=bg.querySelector("#arMsg"); m.classList.add("hide");
+      var kind=bg.querySelector("#ar_kind").value;
+      var body=bg.querySelector("#ar_body").value.trim();
+      var when=bg.querySelector("#ar_when").value;
+      if(!body){ m.textContent="Say what was said."; m.classList.remove("hide"); return; }
+      if(kind==="promise" && !when){
+        m.textContent="A promise needs a date — that is the point of recording it.";
+        m.classList.remove("hide"); return;
+      }
+      var r=await API.call("ar_add_note",{
+        company_id:c.company_id, xero_contact_id:c.xero_contact_id, contact_name:c.contact_name,
+        kind:kind, body:body, promised_on:when||undefined,
+      });
+      if(!r.ok){ m.textContent=AUTH.friendlyError(r.error); m.classList.remove("hide"); return; }
+      bg.remove(); toast("Recorded"); render();
+    };
   }
 
   function tile(k,v,m,accent){
